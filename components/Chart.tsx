@@ -66,23 +66,33 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
         timeVisible: true,
         secondsVisible: false,
         borderColor: config.theme === 'dark' ? '#334158' : '#D6DCDE',
+        // Enable zoom and pan
+        rightOffset: 0,
+        barSpacing: 6,
+        minBarSpacing: 1,
+        fixLeftEdge: false,
+        fixRightEdge: false,
+        lockVisibleTimeRangeOnResize: false,
       },
       crosshair: {
         mode: 1, // Enable crosshair
       },
+      // Enable all interaction modes
       handleScroll: {
         mouseWheel: true,
         pressedMouseMove: true,
         horzTouchDrag: true,
-        vertTouchDrag: true,
+        vertTouchDrag: false, // Disable vertical drag for time scale scrolling
       },
       handleScale: {
         axisPressedMouseMove: true,
         mouseWheel: true,
         pinch: true,
+        axisDoubleClickReset: true,
+        doubleClick: true,
       },
       kineticScroll: {
-        mouse: false,
+        mouse: true,
         touch: true,
       },
     } as any);
@@ -161,22 +171,43 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
     }
   }, [data, timeframe]);
 
+  // Reset active tool when clicking outside drawing tools
+  const handleChartClick = (e: React.MouseEvent) => {
+    if (activeTool && e.target === chartContainerRef.current) {
+      setActiveTool(null);
+    }
+  };
+
   return (
     <div className="chart-container" style={{ position: 'relative', width: '100%', height: '500px' }}>
       <ErrorBoundary>
-        <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
+        <div 
+          ref={chartContainerRef} 
+          style={{ width: '100%', height: '100%', position: 'relative' }} 
+          onClick={handleChartClick}
+        />
         {isChartReady && chart.current && series.current && (
-          <DrawingTools 
-            activeTool={activeTool}
-            onToolSelect={setActiveTool}
-            chart={chart.current}
-            series={series.current}
-            drawings={drawings}
-            onDrawingsUpdate={onDrawingsUpdate}
-            theme={config.theme}
-            isChartReady={isChartReady}
-            chartDimensions={chartDimensions}
-          />
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none', // Critical: allow events to pass through
+            zIndex: 10 // Lower than chart but above for drawing
+          }}>
+            <DrawingTools 
+              activeTool={activeTool}
+              onToolSelect={setActiveTool}
+              chart={chart.current}
+              series={series.current}
+              drawings={drawings}
+              onDrawingsUpdate={onDrawingsUpdate}
+              theme={config.theme}
+              isChartReady={isChartReady}
+              chartDimensions={chartDimensions}
+            />
+          </div>
         )}
       </ErrorBoundary>
     </div>

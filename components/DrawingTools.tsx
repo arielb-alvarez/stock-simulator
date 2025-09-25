@@ -1,4 +1,4 @@
-// DrawingTools.tsx
+// DrawingTools.tsx - Replace the entire component with this fixed version
 import React, { useEffect, useRef, useState } from 'react';
 import { IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { Drawing } from '../types';
@@ -15,23 +15,10 @@ interface DrawingToolsProps {
   chartDimensions: { width: number; height: number };
 }
 
-// Color palette options
 const COLOR_PALETTE = [
-  '#FF0000', // Red
-  '#00FF00', // Green
-  '#0000FF', // Blue
-  '#FFFF00', // Yellow
-  '#FF00FF', // Magenta
-  '#00FFFF', // Cyan
-  '#FFA500', // Orange
-  '#800080', // Purple
-  '#008000', // Dark Green
-  '#000080', // Navy
-  '#FFFFFF', // White
-  '#000000', // Black
-  '#FFC0CB', // Pink
-  '#A52A2A', // Brown
-  '#808080', // Gray
+  '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF',
+  '#00FFFF', '#FFA500', '#800080', '#008000', '#000080',
+  '#FFFFFF', '#000000', '#FFC0CB', '#A52A2A', '#808080',
 ];
 
 const DrawingTools: React.FC<DrawingToolsProps> = ({
@@ -54,7 +41,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   const drawingLayerRef = useRef<HTMLDivElement>(null);
   const colorPickerRef = useRef<HTMLDivElement>(null);
 
-  // Close color picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (colorPickerRef.current && !colorPickerRef.current.contains(event.target as Node)) {
@@ -76,7 +62,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     }
   }, [chart, series, isChartReady]);
 
-  // Safe time conversion function
   const safeTimeToCoordinate = (time: number): number | null => {
     if (!chart || !chart.timeScale()) return null;
     try {
@@ -89,7 +74,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     }
   };
 
-  // Safe coordinate to time conversion
   const safeCoordinateToTime = (coordinate: number): number | null => {
     if (!chart || !chart.timeScale()) return null;
     try {
@@ -101,7 +85,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     }
   };
 
-  // Get price from coordinate
   const coordinateToPrice = (coordinate: number): number | null => {
     if (!series) return null;
     try {
@@ -113,7 +96,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     }
   };
 
-  // Get coordinate from price
   const priceToCoordinate = (price: number): number | null => {
     if (!series) return null;
     try {
@@ -142,15 +124,17 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!activeTool || activeTool === 'eraser' || !chartReady) return;
     
-    e.preventDefault();
-    e.stopPropagation();
+    // Only prevent default for drawing tools, allow chart interactions otherwise
+    if (activeTool) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     
     const pos = getMousePosition(e);
     if (!pos) return;
 
     setIsDrawing(true);
 
-    // Start new drawing with selected color and line width
     const newDrawing: Drawing = {
       id: Date.now().toString(),
       type: activeTool as any,
@@ -162,6 +146,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    // Only interfere if we're actively drawing
     if (!isDrawing || !currentDrawing || !chartReady) return;
     
     e.preventDefault();
@@ -170,24 +155,19 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     const pos = getMousePosition(e);
     if (!pos) return;
 
-    // For freehand drawing, add a new point
     if (currentDrawing.type === 'freehand') {
       const updatedDrawing = {
         ...currentDrawing,
         points: [...currentDrawing.points, { time: pos.time, price: pos.price }]
       };
       setCurrentDrawing(updatedDrawing);
-    } 
-    // For other drawing types, update the second point
-    else if (currentDrawing.points.length === 1) {
+    } else if (currentDrawing.points.length === 1) {
       const updatedDrawing = {
         ...currentDrawing,
         points: [...currentDrawing.points, { time: pos.time, price: pos.price }]
       };
       setCurrentDrawing(updatedDrawing);
-    } 
-    // If we already have two points, update the second one
-    else if (currentDrawing.points.length === 2) {
+    } else if (currentDrawing.points.length === 2) {
       const updatedDrawing = {
         ...currentDrawing,
         points: [currentDrawing.points[0], { time: pos.time, price: pos.price }]
@@ -199,16 +179,15 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   const handleMouseUp = (e: React.MouseEvent) => {
     if (!currentDrawing) return;
     
-    e.preventDefault();
-    e.stopPropagation();
+    if (isDrawing) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     
     setIsDrawing(false);
 
-    // Ensure we have valid points before saving
     if (currentDrawing.points && currentDrawing.points.length > 0) {
-      // For non-freehand drawings, ensure we have exactly 2 points
       if (currentDrawing.type !== 'freehand' && currentDrawing.points.length === 1) {
-        // If we only have one point, duplicate it to create a valid shape
         const completedDrawing = {
           ...currentDrawing,
           points: [currentDrawing.points[0], currentDrawing.points[0]]
@@ -231,11 +210,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     const pos = getMousePosition(e);
     if (!pos) return;
 
-    // Find and remove drawing at this position
     const updatedDrawings = drawings.filter(drawing => {
       if (!drawing.points) return true;
       
-      // Simple hit detection
       return !drawing.points.some(point => {
         const pointX = safeTimeToCoordinate(point.time);
         const pointY = priceToCoordinate(point.price);
@@ -262,15 +239,10 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     }
 
     const validDrawings = drawings.filter(drawing => 
-      drawing && 
-      drawing.id && 
-      drawing.points && 
-      drawing.points.length > 0 &&
+      drawing && drawing.id && drawing.points && drawing.points.length > 0 &&
       drawing.points.every(point => 
-        point.time !== undefined && 
-        point.price !== undefined &&
-        !isNaN(point.time) &&
-        !isNaN(point.price)
+        point.time !== undefined && point.price !== undefined &&
+        !isNaN(point.time) && !isNaN(point.price)
       )
     );
 
@@ -348,7 +320,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           );
         })}
         
-        {/* Render current drawing (in progress) */}
         {currentDrawing && currentDrawing.points && currentDrawing.points.length > 0 && (
           <g key={`current-${currentDrawing.id}`}>
             {currentDrawing.type === 'freehand' && currentDrawing.points.length > 1 && (
@@ -432,7 +403,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
           borderRadius: '8px',
           padding: '10px',
-          zIndex: 30,
+          zIndex: 1000, // Very high z-index to ensure it's above everything
           boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
           minWidth: '200px'
         }}
@@ -500,24 +471,25 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
 
   return (
     <div className="drawing-tools">
+      {/* Toolbar */}
       <div className="tools" style={{ 
         position: 'absolute', 
         top: '10px', 
         left: '10px', 
-        zIndex: 20,
+        zIndex: 100,
         background: theme === 'dark' ? '#2a2e39' : '#ffffff',
         padding: '10px',
         borderRadius: '4px',
         boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
         display: 'flex',
         alignItems: 'center',
-        gap: '5px'
+        gap: '5px',
+        pointerEvents: 'auto' // Toolbar should always be interactive
       }}>
         <button 
           className={activeTool === 'line' ? 'active' : ''}
           onClick={() => onToolSelect(activeTool === 'line' ? null : 'line')}
           style={{ 
-            margin: '0 2px', 
             padding: '5px 8px',
             border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
             background: activeTool === 'line' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
@@ -532,7 +504,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           className={activeTool === 'rectangle' ? 'active' : ''}
           onClick={() => onToolSelect(activeTool === 'rectangle' ? null : 'rectangle')}
           style={{ 
-            margin: '0 2px', 
             padding: '5px 8px',
             border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
             background: activeTool === 'rectangle' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
@@ -547,7 +518,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           className={activeTool === 'circle' ? 'active' : ''}
           onClick={() => onToolSelect(activeTool === 'circle' ? null : 'circle')}
           style={{ 
-            margin: '0 2px', 
             padding: '5px 8px',
             border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
             background: activeTool === 'circle' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
@@ -562,7 +532,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           className={activeTool === 'freehand' ? 'active' : ''}
           onClick={() => onToolSelect(activeTool === 'freehand' ? null : 'freehand')}
           style={{ 
-            margin: '0 2px', 
             padding: '5px 8px',
             border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
             background: activeTool === 'freehand' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
@@ -577,7 +546,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           className={activeTool === 'eraser' ? 'active' : ''}
           onClick={() => onToolSelect(activeTool === 'eraser' ? null : 'eraser')}
           style={{ 
-            margin: '0 2px', 
             padding: '5px 8px',
             border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
             background: activeTool === 'eraser' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
@@ -589,12 +557,10 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           Eraser
         </button>
         
-        {/* Color Picker Button */}
         <div style={{ position: 'relative', display: 'inline-block' }}>
           <button 
             onClick={() => setShowColorPicker(!showColorPicker)}
             style={{ 
-              margin: '0 2px', 
               padding: '5px 8px',
               border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
               background: 'transparent',
@@ -618,7 +584,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           {renderColorPicker()}
         </div>
         
-        {/* Line Width Display */}
         <div style={{ 
           display: 'flex', 
           alignItems: 'center',
@@ -630,6 +595,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
         </div>
       </div>
       
+      {/* Drawing Layer - CRITICAL FIXES */}
       {chartReady && (
         <div 
           ref={drawingLayerRef}
@@ -639,10 +605,12 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
             left: 0,
             width: chartDimensions.width,
             height: chartDimensions.height,
-            cursor: activeTool ? 'crosshair' : 'default',
-            zIndex: activeTool ? 15 : 1,
-            backgroundColor: 'transparent',
-            pointerEvents: activeTool ? 'auto' : 'none'
+            // Only show crosshair when actively drawing
+            cursor: isDrawing ? 'crosshair' : 'default',
+            // CRITICAL: Only capture events when actively using a drawing tool
+            pointerEvents: activeTool && !showColorPicker ? 'auto' : 'none',
+            zIndex: 2, // Lower than toolbar but above chart
+            backgroundColor: 'transparent'
           }}
           onMouseDown={activeTool ? (activeTool === 'eraser' ? handleEraserClick : handleMouseDown) : undefined}
           onMouseMove={isDrawing ? handleMouseMove : undefined}
