@@ -23,7 +23,7 @@ export interface CandleStickData {
   high: number;
   low: number;
   close: number;
-  volume?: number;
+  volume: number;
 }
 
 export interface Drawing {
