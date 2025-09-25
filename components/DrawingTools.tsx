@@ -22,6 +22,22 @@ const COLOR_PALETTE = [
   '#FFFFFF', '#000000', '#FFC0CB', '#A52A2A', '#808080',
 ];
 
+const useDebounce = (value: any, delay: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 const DrawingTools: React.FC<DrawingToolsProps> = ({
   activeTool,
   onToolSelect,
@@ -73,20 +89,36 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     if (!isChartValid() || !chart?.timeScale()) return null;
     
     try {
-      if (visibleRange && (time < visibleRange.from || time > visibleRange.to)) {
+      const chartTime = (time / 1000) as UTCTimestamp;
+      const coord = chart.timeScale().timeToCoordinate(chartTime);
+      
+      // Check if coordinate is valid and within visible range
+      if (coord === null || coord === undefined || isNaN(coord)) {
         return null;
       }
       
-      const chartTime = (time / 1000) as UTCTimestamp;
-      const coord = chart.timeScale().timeToCoordinate(chartTime);
-      return coord !== null && coord !== undefined && !isNaN(coord) ? coord : null;
-    } catch (error) {
-      if (!(chart as any)._internal_disposed) {
-        console.error('Error converting time to coordinate:', error);
+      // Also check if the time is within the current visible time scale range
+      const timeScale = chart.timeScale();
+      const visibleRange = timeScale.getVisibleRange();
+      
+      if (visibleRange) {
+        const visibleFrom = (visibleRange.from as number) * 1000;
+        const visibleTo = (visibleRange.to as number) * 1000;
+        
+        // If time is outside visible range by a small margin, still render it
+        // This prevents drawings from disappearing during zoom/scroll
+        const buffer = (visibleTo - visibleFrom) * 0.1; // 10% buffer
+        if (time < visibleFrom - buffer || time > visibleTo + buffer) {
+          return null;
+        }
       }
+      
+      return coord;
+    } catch (error) {
+      console.warn('Error converting time to coordinate:', error);
       return null;
     }
-  }, [chart, visibleRange, isChartValid]);
+  }, [chart, isChartValid]);
 
   const safeCoordinateToTime = useCallback((coordinate: number): number | null => {
     if (!isChartValid() || !chart?.timeScale()) return null;
@@ -94,9 +126,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
       const time = chart.timeScale().coordinateToTime(coordinate);
       return time !== null && !isNaN(time as number) ? (time as number) * 1000 : null;
     } catch (error) {
-      if (!(chart as any)._internal_disposed) {
-        console.error('Error converting coordinate to time:', error);
-      }
+      console.warn('Error converting coordinate to time:', error);
       return null;
     }
   }, [chart, isChartValid]);
@@ -280,16 +310,31 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     setLineWidth(width);
   };
 
-  const renderDrawings = () => {
+  // Debounce chart dimensions and visible range to prevent excessive re-renders
+  const debouncedDimensions = useDebounce(chartDimensions, 100);
+  const debouncedVisibleRange = useDebounce(visibleRange, 150);
+
+  const renderDrawings = useCallback(() => {
     if (!chartReady || chartDimensions.width === 0 || chartDimensions.height === 0) {
       return null;
     }
 
+    // Filter and validate drawings more robustly
     const validDrawings = drawings.filter(drawing => 
-      drawing && drawing.id && drawing.points && drawing.points.length > 0 &&
+      drawing && 
+      drawing.id && 
+      drawing.type && 
+      drawing.points && 
+      Array.isArray(drawing.points) &&
+      drawing.points.length > 0 &&
       drawing.points.every(point => 
-        point.time !== undefined && point.price !== undefined &&
-        !isNaN(point.time) && !isNaN(point.price)
+        point && 
+        point.time !== undefined && 
+        point.price !== undefined &&
+        !isNaN(point.time) && 
+        !isNaN(point.price) &&
+        point.time > 0 && // Ensure time is positive
+        point.price > 0   // Ensure price is positive
       )
     );
 
@@ -303,153 +348,134 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           left: 0,
           pointerEvents: 'none'
         }}
-        key={`drawings-${visibleRange?.from}-${visibleRange?.to}`} // Force re-render on range change
+        key={`drawings-${chartDimensions.width}-${chartDimensions.height}-${Date.now()}`} // More reliable key
       >
         {validDrawings.map(drawing => {
-          // Convert all points to current coordinate system
-          const coordinates = drawing.points.map(point => ({
-            x: safeTimeToCoordinate(point.time),
-            y: priceToCoordinate(point.price)
-          }));
-          
-          // Filter out points that are not currently visible
-          const visibleCoordinates = coordinates.filter(coord => 
-            coord.x !== null && coord.y !== null && 
-            !isNaN(coord.x!) && !isNaN(coord.y!)
-          );
-          
-          if (visibleCoordinates.length === 0) {
-            return null; // Skip rendering if no points are visible
+          try {
+            // Convert all points to current coordinate system
+            const coordinates = drawing.points.map(point => ({
+              x: safeTimeToCoordinate(point.time),
+              y: priceToCoordinate(point.price)
+            }));
+            
+            // Filter out points that are not currently visible but keep at least 2 points for shapes
+            const validCoordinates = coordinates.filter(coord => 
+              coord.x !== null && coord.y !== null && 
+              !isNaN(coord.x!) && !isNaN(coord.y!)
+            );
+            
+            if (validCoordinates.length === 0) {
+              return null;
+            }
+            
+            // For shapes that need exactly 2 points, ensure we have enough coordinates
+            if ((drawing.type === 'line' || drawing.type === 'rectangle' || drawing.type === 'circle') && 
+                validCoordinates.length < 2) {
+              // If we don't have enough points, try to use the original points with fallback
+              const fallbackCoords = coordinates.map(coord => ({
+                x: coord.x || 0,
+                y: coord.y || 0
+              }));
+              
+              if (fallbackCoords.length >= 2) {
+                return renderDrawingShape(drawing, fallbackCoords);
+              }
+              return null;
+            }
+            
+            return renderDrawingShape(drawing, validCoordinates as {x: number, y: number}[]);
+          } catch (error) {
+            console.warn('Error rendering drawing:', error);
+            return null;
           }
-          
-          const validCoordinates = visibleCoordinates.map(coord => ({
-            x: coord.x as number,
-            y: coord.y as number
-          }));
-          
-          return (
-            <g key={drawing.id}>
-              {drawing.type === 'freehand' && validCoordinates.length > 1 && (
-                <polyline
-                  points={validCoordinates.map(coord => `${coord.x},${coord.y}`).join(' ')}
-                  stroke={drawing.color}
-                  strokeWidth={drawing.width}
-                  fill="none"
-                  vectorEffect="non-scaling-stroke" // Important for consistent stroke width
-                />
-              )}
-              {drawing.type === 'line' && validCoordinates.length >= 2 && (
-                <line
-                  x1={validCoordinates[0].x}
-                  y1={validCoordinates[0].y}
-                  x2={validCoordinates[validCoordinates.length - 1].x}
-                  y2={validCoordinates[validCoordinates.length - 1].y}
-                  stroke={drawing.color}
-                  strokeWidth={drawing.width}
-                  vectorEffect="non-scaling-stroke"
-                />
-              )}
-              {drawing.type === 'rectangle' && validCoordinates.length >= 2 && (
-                <rect
-                  x={Math.min(validCoordinates[0].x, validCoordinates[1].x)}
-                  y={Math.min(validCoordinates[0].y, validCoordinates[1].y)}
-                  width={Math.abs(validCoordinates[1].x - validCoordinates[0].x)}
-                  height={Math.abs(validCoordinates[1].y - validCoordinates[0].y)}
-                  stroke={drawing.color}
-                  strokeWidth={drawing.width}
-                  fill="none"
-                  vectorEffect="non-scaling-stroke"
-                />
-              )}
-              {drawing.type === 'circle' && validCoordinates.length >= 2 && (
-                <circle
-                  cx={validCoordinates[0].x}
-                  cy={validCoordinates[0].y}
-                  r={Math.sqrt(
-                    Math.pow(validCoordinates[1].x - validCoordinates[0].x, 2) + 
-                    Math.pow(validCoordinates[1].y - validCoordinates[0].y, 2)
-                  )}
-                  stroke={drawing.color}
-                  strokeWidth={drawing.width}
-                  fill="none"
-                  vectorEffect="non-scaling-stroke"
-                />
-              )}
-            </g>
-          );
         })}
         
         {/* Current drawing in progress */}
-        {currentDrawing && currentDrawing.points && currentDrawing.points.length > 0 && (
-          <g key={`current-${currentDrawing.id}`}>
-            {currentDrawing.type === 'freehand' && currentDrawing.points.length > 1 && (
-              <polyline
-                points={currentDrawing.points.map(point => {
-                  const x = safeTimeToCoordinate(point.time);
-                  const y = priceToCoordinate(point.price);
-                  return x !== null && y !== null && !isNaN(x) && !isNaN(y) ? `${x},${y}` : '0,0';
-                }).join(' ')}
-                stroke={currentDrawing.color}
-                strokeWidth={currentDrawing.width}
-                fill="none"
-                vectorEffect="non-scaling-stroke"
-              />
-            )}
-            {currentDrawing.type === 'line' && currentDrawing.points.length >= 2 && (
-              <line
-                x1={safeTimeToCoordinate(currentDrawing.points[0].time) || 0}
-                y1={priceToCoordinate(currentDrawing.points[0].price) || 0}
-                x2={safeTimeToCoordinate(currentDrawing.points[1].time) || 0}
-                y2={priceToCoordinate(currentDrawing.points[1].price) || 0}
-                stroke={currentDrawing.color}
-                strokeWidth={currentDrawing.width}
-                vectorEffect="non-scaling-stroke"
-              />
-            )}
-            {currentDrawing.type === 'rectangle' && currentDrawing.points.length >= 2 && (
-              <rect
-                x={Math.min(
-                  safeTimeToCoordinate(currentDrawing.points[0].time) || 0,
-                  safeTimeToCoordinate(currentDrawing.points[1].time) || 0
-                )}
-                y={Math.min(
-                  priceToCoordinate(currentDrawing.points[0].price) || 0,
-                  priceToCoordinate(currentDrawing.points[1].price) || 0
-                )}
-                width={Math.abs(
-                  (safeTimeToCoordinate(currentDrawing.points[1].time) || 0) - 
-                  (safeTimeToCoordinate(currentDrawing.points[0].time) || 0)
-                )}
-                height={Math.abs(
-                  (priceToCoordinate(currentDrawing.points[1].price) || 0) - 
-                  (priceToCoordinate(currentDrawing.points[0].price) || 0)
-                )}
-                stroke={currentDrawing.color}
-                strokeWidth={currentDrawing.width}
-                fill="none"
-                vectorEffect="non-scaling-stroke"
-              />
-            )}
-            {currentDrawing.type === 'circle' && currentDrawing.points.length >= 2 && (
-              <circle
-                cx={safeTimeToCoordinate(currentDrawing.points[0].time) || 0}
-                cy={priceToCoordinate(currentDrawing.points[0].price) || 0}
-                r={Math.sqrt(
-                  Math.pow(
-                    (safeTimeToCoordinate(currentDrawing.points[1].time) || 0) - 
-                    (safeTimeToCoordinate(currentDrawing.points[0].time) || 0), 2) + 
-                  Math.pow((priceToCoordinate(currentDrawing.points[1].price) || 0) - 
-                          (priceToCoordinate(currentDrawing.points[0].price) || 0), 2)
-                )}
-                stroke={currentDrawing.color}
-                strokeWidth={currentDrawing.width}
-                fill="none"
-                vectorEffect="non-scaling-stroke"
-              />
-            )}
-          </g>
-        )}
+        {currentDrawing && renderCurrentDrawing()}
       </svg>
+    );
+  }, [debouncedDimensions, debouncedVisibleRange, drawings, chartReady, isChartValid]);
+
+  // helper function for rendering drawing shapes
+  const renderDrawingShape = (drawing: Drawing, coordinates: {x: number, y: number}[]) => {
+    switch (drawing.type) {
+      case 'freehand':
+        return (
+          <polyline
+            key={drawing.id}
+            points={coordinates.map(coord => `${coord.x},${coord.y}`).join(' ')}
+            stroke={drawing.color}
+            strokeWidth={drawing.width}
+            fill="none"
+            vectorEffect="non-scaling-stroke"
+          />
+        );
+        
+      case 'line':
+        return (
+          <line
+            key={drawing.id}
+            x1={coordinates[0].x}
+            y1={coordinates[0].y}
+            x2={coordinates[coordinates.length - 1].x}
+            y2={coordinates[coordinates.length - 1].y}
+            stroke={drawing.color}
+            strokeWidth={drawing.width}
+            vectorEffect="non-scaling-stroke"
+          />
+        );
+        
+      case 'rectangle':
+        return (
+          <rect
+            key={drawing.id}
+            x={Math.min(coordinates[0].x, coordinates[1].x)}
+            y={Math.min(coordinates[0].y, coordinates[1].y)}
+            width={Math.abs(coordinates[1].x - coordinates[0].x)}
+            height={Math.abs(coordinates[1].y - coordinates[0].y)}
+            stroke={drawing.color}
+            strokeWidth={drawing.width}
+            fill="none"
+            vectorEffect="non-scaling-stroke"
+          />
+        );
+        
+      case 'circle':
+        return (
+          <circle
+            key={drawing.id}
+            cx={coordinates[0].x}
+            cy={coordinates[0].y}
+            r={Math.sqrt(
+              Math.pow(coordinates[1].x - coordinates[0].x, 2) + 
+              Math.pow(coordinates[1].y - coordinates[0].y, 2)
+            )}
+            stroke={drawing.color}
+            strokeWidth={drawing.width}
+            fill="none"
+            vectorEffect="non-scaling-stroke"
+          />
+        );
+        
+      default:
+        return null;
+    }
+  };
+
+  // helper function for rendering current drawing
+  const renderCurrentDrawing = () => {
+    if (!currentDrawing || !currentDrawing.points || currentDrawing.points.length === 0) {
+      return null;
+    }
+
+    const coordinates = currentDrawing.points.map(point => ({
+      x: safeTimeToCoordinate(point.time) || 0,
+      y: priceToCoordinate(point.price) || 0
+    }));
+
+    return renderDrawingShape(
+      { ...currentDrawing, id: 'current' }, 
+      coordinates
     );
   };
 

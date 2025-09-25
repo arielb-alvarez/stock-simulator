@@ -235,16 +235,41 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
 
     series.current.setData(formattedData);
     
-    // Auto-scale to fit data
+    // Auto-scale to fit data but preserve visible range when possible
     if (isChartValid() && formattedData.length > 0) {
-      chart.current!.timeScale().fitContent();
+      const timeScale = chart.current!.timeScale();
       
+      // Only fit content if we have new data or timeframe changed significantly
+      timeScale.fitContent();
+      
+      // Force update of visible range after data change
       setTimeout(() => {
-        setIsChartReady(true);
         updateVisibleRange();
-      }, 200);
+        // Force re-render of drawing tools by updating chart dimensions
+        const chartElement = chart.current!.chartElement();
+        setChartDimensions({
+          width: chartElement.clientWidth,
+          height: chartElement.clientHeight
+        });
+      }, 100);
     }
   }, [data, timeframe, updateVisibleRange, isChartValid]);
+
+  useEffect(() => {
+  if (!isChartValid() || !data.length) return;
+  
+  // When timeframe changes, ensure drawings are re-rendered
+  const timer = setTimeout(() => {
+      updateVisibleRange();
+      const chartElement = chart.current!.chartElement();
+      setChartDimensions({
+        width: chartElement.clientWidth,
+        height: chartElement.clientHeight
+      });
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [timeframe, updateVisibleRange, isChartValid, data.length]);
 
   // Reset active tool when clicking outside drawing tools
   const handleChartClick = (e: React.MouseEvent) => {
