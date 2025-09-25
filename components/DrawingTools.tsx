@@ -1,5 +1,5 @@
 // DrawingTools.tsx - Replace the entire component with this fixed version
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { Drawing } from '../types';
 
@@ -13,6 +13,7 @@ interface DrawingToolsProps {
   theme: 'light' | 'dark';
   isChartReady: boolean;
   chartDimensions: { width: number; height: number };
+  visibleRange: { from: number; to: number } | null;
 }
 
 const COLOR_PALETTE = [
@@ -30,7 +31,8 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   onDrawingsUpdate,
   theme,
   isChartReady,
-  chartDimensions
+  chartDimensions,
+  visibleRange
 }) => {
   const [currentDrawing, setCurrentDrawing] = useState<Drawing | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -40,6 +42,11 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   const [lineWidth, setLineWidth] = useState(2);
   const drawingLayerRef = useRef<HTMLDivElement>(null);
   const colorPickerRef = useRef<HTMLDivElement>(null);
+
+  // Safe chart access function
+  const isChartValid = useCallback(() => {
+    return chart && !(chart as any)._internal_disposed && series;
+  }, [chart, series]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -55,57 +62,70 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   }, []);
 
   useEffect(() => {
-    if (chart && series && isChartReady) {
+    if (isChartValid() && isChartReady) {
       setChartReady(true);
     } else {
       setChartReady(false);
     }
-  }, [chart, series, isChartReady]);
+  }, [chart, series, isChartReady, isChartValid]);
 
-  const safeTimeToCoordinate = (time: number): number | null => {
-    if (!chart || !chart.timeScale()) return null;
+  const safeTimeToCoordinate = useCallback((time: number): number | null => {
+    if (!isChartValid() || !chart?.timeScale()) return null;
+    
     try {
+      if (visibleRange && (time < visibleRange.from || time > visibleRange.to)) {
+        return null;
+      }
+      
       const chartTime = (time / 1000) as UTCTimestamp;
       const coord = chart.timeScale().timeToCoordinate(chartTime);
       return coord !== null && coord !== undefined && !isNaN(coord) ? coord : null;
     } catch (error) {
-      console.error('Error converting time to coordinate:', error);
+      if (!(chart as any)._internal_disposed) {
+        console.error('Error converting time to coordinate:', error);
+      }
       return null;
     }
-  };
+  }, [chart, visibleRange, isChartValid]);
 
-  const safeCoordinateToTime = (coordinate: number): number | null => {
-    if (!chart || !chart.timeScale()) return null;
+  const safeCoordinateToTime = useCallback((coordinate: number): number | null => {
+    if (!isChartValid() || !chart?.timeScale()) return null;
     try {
       const time = chart.timeScale().coordinateToTime(coordinate);
       return time !== null && !isNaN(time as number) ? (time as number) * 1000 : null;
     } catch (error) {
-      console.error('Error converting coordinate to time:', error);
+      if (!(chart as any)._internal_disposed) {
+        console.error('Error converting coordinate to time:', error);
+      }
       return null;
     }
-  };
+  }, [chart, isChartValid]);
 
-  const coordinateToPrice = (coordinate: number): number | null => {
-    if (!series) return null;
+  const coordinateToPrice = useCallback((coordinate: number): number | null => {
+    if (!isChartValid()) return null;
     try {
-      const price = series.coordinateToPrice(coordinate);
+      const price = series!.coordinateToPrice(coordinate);
       return price !== null && !isNaN(price) ? price : null;
     } catch (error) {
-      console.error('Error converting coordinate to price:', error);
+      if (!(chart as any)._internal_disposed) {
+        console.error('Error converting coordinate to price:', error);
+      }
       return null;
     }
-  };
+  }, [series, isChartValid]);
 
-  const priceToCoordinate = (price: number): number | null => {
-    if (!series) return null;
+  const priceToCoordinate = useCallback((price: number): number | null => {
+    if (!isChartValid()) return null;
     try {
-      const coord = series.priceToCoordinate(price);
+      const coord = series!.priceToCoordinate(price);
       return coord !== null && !isNaN(coord) ? coord : null;
     } catch (error) {
-      console.error('Error converting price to coordinate:', error);
+      if (!(chart as any)._internal_disposed) {
+        console.error('Error converting price to coordinate:', error);
+      }
       return null;
     }
-  };
+  }, [series, isChartValid]);
 
   const getMousePosition = (e: React.MouseEvent) => {
     if (!chartReady || !drawingLayerRef.current) return null;
@@ -283,18 +303,26 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           left: 0,
           pointerEvents: 'none'
         }}
+        key={`drawings-${visibleRange?.from}-${visibleRange?.to}`} // Force re-render on range change
       >
         {validDrawings.map(drawing => {
+          // Convert all points to current coordinate system
           const coordinates = drawing.points.map(point => ({
             x: safeTimeToCoordinate(point.time),
             y: priceToCoordinate(point.price)
           }));
           
-          if (coordinates.some(coord => coord.x === null || coord.y === null || isNaN(coord.x!) || isNaN(coord.y!))) {
-            return null;
+          // Filter out points that are not currently visible
+          const visibleCoordinates = coordinates.filter(coord => 
+            coord.x !== null && coord.y !== null && 
+            !isNaN(coord.x!) && !isNaN(coord.y!)
+          );
+          
+          if (visibleCoordinates.length === 0) {
+            return null; // Skip rendering if no points are visible
           }
           
-          const validCoordinates = coordinates.map(coord => ({
+          const validCoordinates = visibleCoordinates.map(coord => ({
             x: coord.x as number,
             y: coord.y as number
           }));
@@ -307,19 +335,21 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
                   stroke={drawing.color}
                   strokeWidth={drawing.width}
                   fill="none"
+                  vectorEffect="non-scaling-stroke" // Important for consistent stroke width
                 />
               )}
-              {drawing.type === 'line' && validCoordinates.length === 2 && (
+              {drawing.type === 'line' && validCoordinates.length >= 2 && (
                 <line
                   x1={validCoordinates[0].x}
                   y1={validCoordinates[0].y}
-                  x2={validCoordinates[1].x}
-                  y2={validCoordinates[1].y}
+                  x2={validCoordinates[validCoordinates.length - 1].x}
+                  y2={validCoordinates[validCoordinates.length - 1].y}
                   stroke={drawing.color}
                   strokeWidth={drawing.width}
+                  vectorEffect="non-scaling-stroke"
                 />
               )}
-              {drawing.type === 'rectangle' && validCoordinates.length === 2 && (
+              {drawing.type === 'rectangle' && validCoordinates.length >= 2 && (
                 <rect
                   x={Math.min(validCoordinates[0].x, validCoordinates[1].x)}
                   y={Math.min(validCoordinates[0].y, validCoordinates[1].y)}
@@ -328,9 +358,10 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
                   stroke={drawing.color}
                   strokeWidth={drawing.width}
                   fill="none"
+                  vectorEffect="non-scaling-stroke"
                 />
               )}
-              {drawing.type === 'circle' && validCoordinates.length === 2 && (
+              {drawing.type === 'circle' && validCoordinates.length >= 2 && (
                 <circle
                   cx={validCoordinates[0].x}
                   cy={validCoordinates[0].y}
@@ -341,12 +372,14 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
                   stroke={drawing.color}
                   strokeWidth={drawing.width}
                   fill="none"
+                  vectorEffect="non-scaling-stroke"
                 />
               )}
             </g>
           );
         })}
         
+        {/* Current drawing in progress */}
         {currentDrawing && currentDrawing.points && currentDrawing.points.length > 0 && (
           <g key={`current-${currentDrawing.id}`}>
             {currentDrawing.type === 'freehand' && currentDrawing.points.length > 1 && (
@@ -359,9 +392,10 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
                 stroke={currentDrawing.color}
                 strokeWidth={currentDrawing.width}
                 fill="none"
+                vectorEffect="non-scaling-stroke"
               />
             )}
-            {currentDrawing.type === 'line' && currentDrawing.points.length === 2 && (
+            {currentDrawing.type === 'line' && currentDrawing.points.length >= 2 && (
               <line
                 x1={safeTimeToCoordinate(currentDrawing.points[0].time) || 0}
                 y1={priceToCoordinate(currentDrawing.points[0].price) || 0}
@@ -369,9 +403,10 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
                 y2={priceToCoordinate(currentDrawing.points[1].price) || 0}
                 stroke={currentDrawing.color}
                 strokeWidth={currentDrawing.width}
+                vectorEffect="non-scaling-stroke"
               />
             )}
-            {currentDrawing.type === 'rectangle' && currentDrawing.points.length === 2 && (
+            {currentDrawing.type === 'rectangle' && currentDrawing.points.length >= 2 && (
               <rect
                 x={Math.min(
                   safeTimeToCoordinate(currentDrawing.points[0].time) || 0,
@@ -392,9 +427,10 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
                 stroke={currentDrawing.color}
                 strokeWidth={currentDrawing.width}
                 fill="none"
+                vectorEffect="non-scaling-stroke"
               />
             )}
-            {currentDrawing.type === 'circle' && currentDrawing.points.length === 2 && (
+            {currentDrawing.type === 'circle' && currentDrawing.points.length >= 2 && (
               <circle
                 cx={safeTimeToCoordinate(currentDrawing.points[0].time) || 0}
                 cy={priceToCoordinate(currentDrawing.points[0].price) || 0}
@@ -408,6 +444,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
                 stroke={currentDrawing.color}
                 strokeWidth={currentDrawing.width}
                 fill="none"
+                vectorEffect="non-scaling-stroke"
               />
             )}
           </g>
@@ -511,7 +548,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
         display: 'flex',
         alignItems: 'center',
         gap: '5px',
-        pointerEvents: 'auto' // Toolbar should always be interactive
+        pointerEvents: 'auto'
       }}>
         <button 
           className={activeTool === 'line' ? 'active' : ''}
@@ -632,11 +669,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
             left: 0,
             width: chartDimensions.width,
             height: chartDimensions.height,
-            // Only show crosshair when actively drawing
             cursor: isDrawing ? 'crosshair' : 'default',
-            // CRITICAL: Only capture events when actively using a drawing tool
             pointerEvents: activeTool && !showColorPicker ? 'auto' : 'none',
-            zIndex: 2, // Lower than toolbar but above chart
+            zIndex: 2,
             backgroundColor: 'transparent'
           }}
           onMouseDown={activeTool ? (activeTool === 'eraser' ? handleEraserClick : handleMouseDown) : undefined}

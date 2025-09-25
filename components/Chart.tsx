@@ -1,5 +1,5 @@
-// Chart.tsx
-import React, { useEffect, useRef, useState } from 'react';
+// Chart.tsx - Fixed version with proper cleanup
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { CandleStickData, Drawing, ChartConfig } from '../types';
 import DrawingTools from './DrawingTools';
@@ -42,9 +42,48 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [isChartReady, setIsChartReady] = useState(false);
   const [chartDimensions, setChartDimensions] = useState({ width: 0, height: 0 });
+  const [visibleRange, setVisibleRange] = useState<{ from: number; to: number } | null>(null);
+
+  // Track if chart is disposed using a ref
+  const isChartDisposed = useRef(false);
+
+  // Use refs for event handlers to avoid stale closures
+  const handlersRef = useRef<{
+    handleVisibleRangeChange: (() => void) | null;
+    handleResize: (() => void) | null;
+  }>({ handleVisibleRangeChange: null, handleResize: null });
+
+  // Function to check if chart is still valid
+  const isChartValid = useCallback(() => {
+    return chart.current && !isChartDisposed.current && chartContainerRef.current;
+  }, []);
+
+  // Function to get current visible time range
+  const updateVisibleRange = useCallback(() => {
+    if (!isChartValid()) return;
+    
+    try {
+      const timeScale = chart.current!.timeScale();
+      const visibleRange = timeScale.getVisibleRange();
+      if (visibleRange) {
+        setVisibleRange({
+          from: (visibleRange.from as number) * 1000,
+          to: (visibleRange.to as number) * 1000
+        });
+      }
+    } catch (error) {
+      // If we get an error, the chart might be disposed
+      if (!isChartValid()) {
+        console.error('Error getting visible range:', error);
+      }
+    }
+  }, [isChartValid]);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
+
+    // Reset disposal flag
+    isChartDisposed.current = false;
 
     // Initialize chart with proper interactivity options
     chart.current = createChart(chartContainerRef.current, {
@@ -66,7 +105,6 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
         timeVisible: true,
         secondsVisible: false,
         borderColor: config.theme === 'dark' ? '#334158' : '#D6DCDE',
-        // Enable zoom and pan
         rightOffset: 0,
         barSpacing: 6,
         minBarSpacing: 1,
@@ -75,14 +113,13 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
         lockVisibleTimeRangeOnResize: false,
       },
       crosshair: {
-        mode: 1, // Enable crosshair
+        mode: 1,
       },
-      // Enable all interaction modes
       handleScroll: {
         mouseWheel: true,
         pressedMouseMove: true,
         horzTouchDrag: true,
-        vertTouchDrag: false, // Disable vertical drag for time scale scrolling
+        vertTouchDrag: false,
       },
       handleScale: {
         axisPressedMouseMove: true,
@@ -106,12 +143,43 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
       wickDownColor: '#ef5350',
     });
 
-    // Set chart as ready after initialization
+    // Create stable event handlers
+    const handleVisibleRangeChange = () => {
+      updateVisibleRange();
+    };
+
+    const handleResize = () => {
+      if (isChartValid()) {
+        chart.current!.applyOptions({
+          width: chartContainerRef.current!.clientWidth,
+        });
+        
+        const chartElement = chart.current!.chartElement();
+        setChartDimensions({
+          width: chartElement.clientWidth,
+          height: chartElement.clientHeight
+        });
+      }
+      updateVisibleRange();
+    };
+
+    // Store handlers in ref for cleanup
+    handlersRef.current = { handleVisibleRangeChange, handleResize };
+
+    // Subscribe to time scale events
+    const timeScale = chart.current.timeScale();
+    timeScale.subscribeVisibleTimeRangeChange(handleVisibleRangeChange);
+    timeScale.subscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
+
+    // Subscribe to crosshair movement for updates
+    chart.current.subscribeCrosshairMove(handleVisibleRangeChange);
+
     const timer = setTimeout(() => {
-      setIsChartReady(true);
-      
-      if (chart.current) {
-        const chartElement = chart.current.chartElement();
+      if (isChartValid()) {
+        setIsChartReady(true);
+        updateVisibleRange();
+        
+        const chartElement = chart.current!.chartElement();
         setChartDimensions({
           width: chartElement.clientWidth,
           height: chartElement.clientHeight
@@ -119,34 +187,40 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
       }
     }, 300);
 
-    // Handle window resize
-    const handleResize = () => {
-      if (chart.current && chartContainerRef.current) {
-        chart.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-        });
-        
-        if (chart.current) {
-          const chartElement = chart.current.chartElement();
-          setChartDimensions({
-            width: chartElement.clientWidth,
-            height: chartElement.clientHeight
-          });
-        }
-      }
-    };
-
     window.addEventListener('resize', handleResize);
 
     return () => {
       clearTimeout(timer);
+      
+      // Mark chart as disposed
+      isChartDisposed.current = true;
+      
+      // Remove event listeners first
       window.removeEventListener('resize', handleResize);
+      
+      // Clean up chart subscriptions and remove chart
       if (chart.current) {
-        chart.current.remove();
+        try {
+          const timeScale = chart.current.timeScale();
+          const { handleVisibleRangeChange } = handlersRef.current;
+          
+          if (handleVisibleRangeChange) {
+            timeScale.unsubscribeVisibleTimeRangeChange(handleVisibleRangeChange);
+            timeScale.unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
+            chart.current.unsubscribeCrosshairMove(handleVisibleRangeChange);
+          }
+          
+          chart.current.remove();
+        } catch (error) {
+          // Ignore disposal errors
+          console.warn('Error during chart cleanup:', error);
+        }
       }
+      
       setIsChartReady(false);
+      handlersRef.current = { handleVisibleRangeChange: null, handleResize: null };
     };
-  }, [config]);
+  }, [config, updateVisibleRange, isChartValid]);
 
   useEffect(() => {
     if (!series.current || !data.length) return;
@@ -162,14 +236,15 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
     series.current.setData(formattedData);
     
     // Auto-scale to fit data
-    if (chart.current && formattedData.length > 0) {
-      chart.current.timeScale().fitContent();
+    if (isChartValid() && formattedData.length > 0) {
+      chart.current!.timeScale().fitContent();
       
       setTimeout(() => {
         setIsChartReady(true);
+        updateVisibleRange();
       }, 200);
     }
-  }, [data, timeframe]);
+  }, [data, timeframe, updateVisibleRange, isChartValid]);
 
   // Reset active tool when clicking outside drawing tools
   const handleChartClick = (e: React.MouseEvent) => {
@@ -186,26 +261,27 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
           style={{ width: '100%', height: '100%', position: 'relative' }} 
           onClick={handleChartClick}
         />
-        {isChartReady && chart.current && series.current && (
+        {isChartReady && isChartValid() && (
           <div style={{
             position: 'absolute',
             top: 0,
             left: 0,
             width: '100%',
             height: '100%',
-            pointerEvents: 'none', // Critical: allow events to pass through
-            zIndex: 10 // Lower than chart but above for drawing
+            pointerEvents: 'none',
+            zIndex: 10
           }}>
             <DrawingTools 
               activeTool={activeTool}
               onToolSelect={setActiveTool}
-              chart={chart.current}
-              series={series.current}
+              chart={chart.current!}
+              series={series.current!}
               drawings={drawings}
               onDrawingsUpdate={onDrawingsUpdate}
               theme={config.theme}
               isChartReady={isChartReady}
               chartDimensions={chartDimensions}
+              visibleRange={visibleRange}
             />
           </div>
         )}
