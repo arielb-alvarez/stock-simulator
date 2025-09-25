@@ -23,22 +23,25 @@ export interface CandleStickData {
   high: number;
   low: number;
   close: number;
-  volume: number;
+  volume?: number;
 }
 
 export interface Drawing {
   id: string;
   type: 'line' | 'rectangle' | 'circle' | 'freehand';
-  points: Array<{
-    time: number;  // Time in milliseconds
-    price: number; // Price value
-  }>;
+  points: Point[];
   color: string;
   width: number;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 export interface ChartConfig {
-  type: 'candlestick' | 'line';
   theme: 'light' | 'dark';
-  showLegend: boolean;
+  type: 'candlestick' | 'line' | 'bar';
+}
+
+export interface Point {
+  time: number;
+  price: number;
 }

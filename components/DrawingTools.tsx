@@ -187,18 +187,42 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     setIsDrawing(false);
 
     if (currentDrawing.points && currentDrawing.points.length > 0) {
+      let completedDrawing: Drawing;
+      
       if (currentDrawing.type !== 'freehand' && currentDrawing.points.length === 1) {
-        const completedDrawing = {
+        // For shapes that need exactly 2 points but user only clicked once
+        completedDrawing = {
           ...currentDrawing,
-          points: [currentDrawing.points[0], currentDrawing.points[0]]
+          points: [currentDrawing.points[0], currentDrawing.points[0]], // Duplicate point
+          createdAt: Date.now()
         };
-        onDrawingsUpdate([...drawings, completedDrawing]);
       } else {
-        onDrawingsUpdate([...drawings, currentDrawing]);
+        completedDrawing = {
+          ...currentDrawing,
+          createdAt: Date.now()
+        };
       }
+      
+      // Add the new drawing to the existing ones and save
+      const updatedDrawings = [...drawings, completedDrawing];
+      onDrawingsUpdate(updatedDrawings);
     }
     
     setCurrentDrawing(null);
+  };
+
+  const handleDrawingUpdate = (updatedDrawings: Drawing[]) => {
+    // Filter out any invalid drawings before saving
+    const validDrawings = updatedDrawings.filter(drawing => 
+      drawing && 
+      drawing.id && 
+      drawing.type && 
+      drawing.points && 
+      Array.isArray(drawing.points) &&
+      drawing.points.length > 0
+    );
+    
+    onDrawingsUpdate(validDrawings);
   };
 
   const handleEraserClick = (e: React.MouseEvent) => {
@@ -211,17 +235,20 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     if (!pos) return;
 
     const updatedDrawings = drawings.filter(drawing => {
-      if (!drawing.points) return true;
+      if (!drawing.points) return false;
       
-      return !drawing.points.some(point => {
+      // Check if any point in the drawing is near the click position
+      const isNear = drawing.points.some(point => {
         const pointX = safeTimeToCoordinate(point.time);
         const pointY = priceToCoordinate(point.price);
         return pointX !== null && pointY !== null && 
-               Math.abs(pointX - pos.x) < 10 && Math.abs(pointY - pos.y) < 10;
+              Math.abs(pointX - pos.x) < 10 && Math.abs(pointY - pos.y) < 10;
       });
+      
+      return !isNear; // Keep drawings that are NOT near the click
     });
     
-    onDrawingsUpdate(updatedDrawings);
+    handleDrawingUpdate(updatedDrawings);
   };
 
   const handleColorSelect = (color: string) => {

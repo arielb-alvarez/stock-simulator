@@ -6,13 +6,15 @@ interface ToolbarProps {
   onConfigChange: (config: ChartConfig) => void;
   onTimeframeChange: (timeframe: string) => void;
   timeframe: string;
+  onClearDrawings?: () => void; // Add this prop
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({ 
   config, 
   onConfigChange, 
   onTimeframeChange, 
-  timeframe 
+  timeframe,
+  onClearDrawings
 }) => {
   const updateConfig = (updates: Partial<ChartConfig>) => {
     onConfigChange({ ...config, ...updates });
@@ -34,6 +36,20 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <option value="1d">1 Day</option>
         </select>
       </div>
+
+      <button 
+        onClick={onClearDrawings}
+        style={{ 
+          padding: '5px 10px',
+          border: '1px solid #ccc',
+          background: '#ff4444',
+          color: 'white',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        }}
+      >
+        Clear Drawings
+      </button>
 
       <div className="toolbar-section">
         <label>Theme:</label>

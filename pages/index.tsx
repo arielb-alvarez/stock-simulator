@@ -11,7 +11,7 @@ const Home: React.FC = () => {
   const [timeframe, setTimeframe] = useState('5m');
   // const { candleData, isConnected, error } = useMockData('btcusdt', timeframe);
   const { candleData, isConnected, error, dataSource } = useCryptoData('btcusdt', timeframe);
-  const { drawings, chartConfig, saveDrawings, saveChartConfig } = useCookies();
+  const { drawings, chartConfig, saveDrawings, saveChartConfig, clearDrawings  } = useCookies();
   const [config, setConfig] = useState<ChartConfig>({
     ...chartConfig,
     type: 'candlestick'
@@ -24,6 +24,12 @@ const Home: React.FC = () => {
 
   const handleTimeframeChange = (newTimeframe: string) => {
     setTimeframe(newTimeframe);
+  };
+
+  const handleClearDrawings = () => {
+    if (window.confirm('Are you sure you want to clear all drawings?')) {
+      clearDrawings();
+    }
   };
 
   return (
@@ -49,6 +55,7 @@ const Home: React.FC = () => {
         onConfigChange={updateConfig} 
         onTimeframeChange={handleTimeframeChange}
         timeframe={timeframe}
+        onClearDrawings={handleClearDrawings}
       />
 
       <main>

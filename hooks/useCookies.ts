@@ -1,61 +1,90 @@
+// hooks/useCookies.ts
 import { useState, useEffect } from 'react';
 import { Drawing, ChartConfig } from '../types';
 
 const useCookies = () => {
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [chartConfig, setChartConfig] = useState<ChartConfig>({
-    type: 'line',
     theme: 'dark',
-    showLegend: true
+    type: 'candlestick'
   });
 
+  // Load drawings and config from localStorage on component mount
   useEffect(() => {
-    // Load drawings from cookies
-    const drawingsCookie = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('drawings='));
-    
-    if (drawingsCookie) {
+    const loadDrawings = () => {
       try {
-        const drawingsData = JSON.parse(decodeURIComponent(drawingsCookie.split('=')[1]));
-        setDrawings(drawingsData);
-      } catch (e) {
-        console.error('Error parsing drawings cookie:', e);
+        const savedDrawings = localStorage.getItem('chart-drawings');
+        if (savedDrawings) {
+          const parsedDrawings = JSON.parse(savedDrawings);
+          // Validate the parsed drawings structure
+          if (Array.isArray(parsedDrawings)) {
+            setDrawings(parsedDrawings);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading drawings from localStorage:', error);
       }
-    }
+    };
 
-    // Load chart config from cookies
-    const configCookie = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('chartConfig='));
-    
-    if (configCookie) {
+    const loadChartConfig = () => {
       try {
-        const configData = JSON.parse(decodeURIComponent(configCookie.split('=')[1]));
-        setChartConfig(configData);
-      } catch (e) {
-        console.error('Error parsing config cookie:', e);
+        const savedConfig = localStorage.getItem('chart-config');
+        if (savedConfig) {
+          const parsedConfig = JSON.parse(savedConfig);
+          setChartConfig(prev => ({ ...prev, ...parsedConfig }));
+        }
+      } catch (error) {
+        console.error('Error loading chart config from localStorage:', error);
       }
-    }
+    };
+
+    loadDrawings();
+    loadChartConfig();
   }, []);
 
   const saveDrawings = (newDrawings: Drawing[]) => {
-    setDrawings(newDrawings);
-    const serialized = JSON.stringify(newDrawings);
-    document.cookie = `drawings=${encodeURIComponent(serialized)}; max-age=${60 * 60 * 24 * 7}`; // 1 week
+    try {
+      // Validate drawings before saving
+      const validDrawings = newDrawings.filter(drawing => 
+        drawing && 
+        drawing.id && 
+        drawing.type && 
+        drawing.points && 
+        Array.isArray(drawing.points) &&
+        drawing.points.length > 0
+      );
+      
+      localStorage.setItem('chart-drawings', JSON.stringify(validDrawings));
+      setDrawings(validDrawings);
+    } catch (error) {
+      console.error('Error saving drawings to localStorage:', error);
+    }
   };
 
   const saveChartConfig = (newConfig: ChartConfig) => {
-    setChartConfig(newConfig);
-    const serialized = JSON.stringify(newConfig);
-    document.cookie = `chartConfig=${encodeURIComponent(serialized)}; max-age=${60 * 60 * 24 * 7}`; // 1 week
+    try {
+      localStorage.setItem('chart-config', JSON.stringify(newConfig));
+      setChartConfig(newConfig);
+    } catch (error) {
+      console.error('Error saving chart config to localStorage:', error);
+    }
+  };
+
+  const clearDrawings = () => {
+    try {
+      localStorage.removeItem('chart-drawings');
+      setDrawings([]);
+    } catch (error) {
+      console.error('Error clearing drawings:', error);
+    }
   };
 
   return {
     drawings,
     chartConfig,
     saveDrawings,
-    saveChartConfig
+    saveChartConfig,
+    clearDrawings
   };
 };
 
