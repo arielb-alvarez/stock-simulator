@@ -46,7 +46,7 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    // Initialize chart
+    // Initialize chart with proper interactivity options
     chart.current = createChart(chartContainerRef.current, {
       layout: {
         backgroundColor: config.theme === 'dark' ? '#131722' : '#FFFFFF',
@@ -65,7 +65,26 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
       timeScale: {
         timeVisible: true,
         secondsVisible: false,
-      }
+        borderColor: config.theme === 'dark' ? '#334158' : '#D6DCDE',
+      },
+      crosshair: {
+        mode: 1, // Enable crosshair
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: true,
+      },
+      handleScale: {
+        axisPressedMouseMove: true,
+        mouseWheel: true,
+        pinch: true,
+      },
+      kineticScroll: {
+        mouse: false,
+        touch: true,
+      },
     } as any);
 
     // Create candlestick series
@@ -77,11 +96,10 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
       wickDownColor: '#ef5350',
     });
 
-    // Set chart as ready after a short delay
+    // Set chart as ready after initialization
     const timer = setTimeout(() => {
       setIsChartReady(true);
       
-      // Get chart dimensions
       if (chart.current) {
         const chartElement = chart.current.chartElement();
         setChartDimensions({
@@ -89,7 +107,7 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
           height: chartElement.clientHeight
         });
       }
-    }, 100);
+    }, 300);
 
     // Handle window resize
     const handleResize = () => {
@@ -98,7 +116,6 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
           width: chartContainerRef.current.clientWidth,
         });
         
-        // Update chart dimensions
         if (chart.current) {
           const chartElement = chart.current.chartElement();
           setChartDimensions({
@@ -134,11 +151,10 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
 
     series.current.setData(formattedData);
     
-    // Auto-scale to fit data with callback
+    // Auto-scale to fit data
     if (chart.current && formattedData.length > 0) {
       chart.current.timeScale().fitContent();
       
-      // Small delay to ensure scaling is complete
       setTimeout(() => {
         setIsChartReady(true);
       }, 200);
@@ -149,17 +165,19 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
     <div className="chart-container" style={{ position: 'relative', width: '100%', height: '500px' }}>
       <ErrorBoundary>
         <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
-        <DrawingTools 
-          activeTool={activeTool}
-          onToolSelect={setActiveTool}
-          chart={chart.current}
-          series={series.current}
-          drawings={drawings}
-          onDrawingsUpdate={onDrawingsUpdate}
-          theme={config.theme}
-          isChartReady={isChartReady}
-          chartDimensions={chartDimensions}
-        />
+        {isChartReady && chart.current && series.current && (
+          <DrawingTools 
+            activeTool={activeTool}
+            onToolSelect={setActiveTool}
+            chart={chart.current}
+            series={series.current}
+            drawings={drawings}
+            onDrawingsUpdate={onDrawingsUpdate}
+            theme={config.theme}
+            isChartReady={isChartReady}
+            chartDimensions={chartDimensions}
+          />
+        )}
       </ErrorBoundary>
     </div>
   );

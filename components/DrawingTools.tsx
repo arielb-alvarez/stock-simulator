@@ -15,6 +15,25 @@ interface DrawingToolsProps {
   chartDimensions: { width: number; height: number };
 }
 
+// Color palette options
+const COLOR_PALETTE = [
+  '#FF0000', // Red
+  '#00FF00', // Green
+  '#0000FF', // Blue
+  '#FFFF00', // Yellow
+  '#FF00FF', // Magenta
+  '#00FFFF', // Cyan
+  '#FFA500', // Orange
+  '#800080', // Purple
+  '#008000', // Dark Green
+  '#000080', // Navy
+  '#FFFFFF', // White
+  '#000000', // Black
+  '#FFC0CB', // Pink
+  '#A52A2A', // Brown
+  '#808080', // Gray
+];
+
 const DrawingTools: React.FC<DrawingToolsProps> = ({
   activeTool,
   onToolSelect,
@@ -29,35 +48,37 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   const [currentDrawing, setCurrentDrawing] = useState<Drawing | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [chartReady, setChartReady] = useState(false);
+  const [selectedColor, setSelectedColor] = useState(theme === 'dark' ? '#FFFFFF' : '#000000');
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [lineWidth, setLineWidth] = useState(2);
   const drawingLayerRef = useRef<HTMLDivElement>(null);
+  const colorPickerRef = useRef<HTMLDivElement>(null);
+
+  // Close color picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(event.target as Node)) {
+        setShowColorPicker(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
-    const checkChartReady = () => {
-      if (chart && series && chart.timeScale() && isChartReady) {
-        // Additional check to ensure time scale is properly initialized
-        try {
-          const timeScale = chart.timeScale();
-          if (timeScale.width() > 0) {
-            setChartReady(true);
-            console.log('Chart is now ready with data and proper scaling');
-            return;
-          }
-        } catch (e) {
-          console.log('Time scale not fully initialized yet');
-        }
-      }
-      setTimeout(checkChartReady, 100);
-    };
-    
-    checkChartReady();
+    if (chart && series && isChartReady) {
+      setChartReady(true);
+    } else {
+      setChartReady(false);
+    }
   }, [chart, series, isChartReady]);
 
   // Safe time conversion function
   const safeTimeToCoordinate = (time: number): number | null => {
-    if (!chart || !chart.timeScale()) {
-      console.log('Chart or timeScale not available');
-      return null;
-    }
+    if (!chart || !chart.timeScale()) return null;
     try {
       const chartTime = (time / 1000) as UTCTimestamp;
       const coord = chart.timeScale().timeToCoordinate(chartTime);
@@ -119,36 +140,35 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (!activeTool || activeTool === 'eraser' || !chartReady) return;
+    
     e.preventDefault();
     e.stopPropagation();
-    
-    if (!activeTool || activeTool === 'eraser' || !chartReady) return;
     
     const pos = getMousePosition(e);
     if (!pos) return;
 
     setIsDrawing(true);
 
-    // Start new drawing
+    // Start new drawing with selected color and line width
     const newDrawing: Drawing = {
       id: Date.now().toString(),
       type: activeTool as any,
       points: [{ time: pos.time, price: pos.price }],
-      color: theme === 'dark' ? '#FFFFFF' : '#000000',
-      width: 2
+      color: selectedColor,
+      width: lineWidth
     };
     setCurrentDrawing(newDrawing);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    e.preventDefault();
     if (!isDrawing || !currentDrawing || !chartReady) return;
     
+    e.preventDefault();
+    e.stopPropagation();
+    
     const pos = getMousePosition(e);
-    if (!pos) {
-      console.log('Invalid mouse position during move');
-      return;
-    }
+    if (!pos) return;
 
     // For freehand drawing, add a new point
     if (currentDrawing.type === 'freehand') {
@@ -177,8 +197,10 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   };
 
   const handleMouseUp = (e: React.MouseEvent) => {
-    e.preventDefault();
     if (!currentDrawing) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
     
     setIsDrawing(false);
 
@@ -203,6 +225,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   const handleEraserClick = (e: React.MouseEvent) => {
     if (activeTool !== 'eraser' || !chartReady) return;
     
+    e.preventDefault();
+    e.stopPropagation();
+    
     const pos = getMousePosition(e);
     if (!pos) return;
 
@@ -222,10 +247,17 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     onDrawingsUpdate(updatedDrawings);
   };
 
-  // Update the renderDrawings function
+  const handleColorSelect = (color: string) => {
+    setSelectedColor(color);
+    setShowColorPicker(false);
+  };
+
+  const handleLineWidthChange = (width: number) => {
+    setLineWidth(width);
+  };
+
   const renderDrawings = () => {
-    if (!chartReady) {
-      console.log('Chart not ready');
+    if (!chartReady || chartDimensions.width === 0 || chartDimensions.height === 0) {
       return null;
     }
 
@@ -254,19 +286,15 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
         }}
       >
         {validDrawings.map(drawing => {
-          // Convert all points to coordinates first
           const coordinates = drawing.points.map(point => ({
             x: safeTimeToCoordinate(point.time),
             y: priceToCoordinate(point.price)
           }));
           
-          // Skip if any coordinates are invalid or NaN
-          if (coordinates.some(coord => coord.x === null || coord.y === null || isNaN(coord.x) || isNaN(coord.y))) {
-            console.log('Skipping drawing with invalid coordinates');
+          if (coordinates.some(coord => coord.x === null || coord.y === null || isNaN(coord.x!) || isNaN(coord.y!))) {
             return null;
           }
           
-          // Cast coordinates to valid numbers
           const validCoordinates = coordinates.map(coord => ({
             x: coord.x as number,
             y: coord.y as number
@@ -390,39 +418,216 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     );
   };
 
+  const renderColorPicker = () => {
+    if (!showColorPicker) return null;
+
+    return (
+      <div
+        ref={colorPickerRef}
+        style={{
+          position: 'absolute',
+          top: '50px',
+          left: '120px',
+          background: theme === 'dark' ? '#2a2e39' : '#ffffff',
+          border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+          borderRadius: '8px',
+          padding: '10px',
+          zIndex: 30,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+          minWidth: '200px'
+        }}
+      >
+        <div style={{ marginBottom: '10px', fontSize: '12px', fontWeight: 'bold' }}>
+          Select Color
+        </div>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(5, 1fr)', 
+          gap: '5px',
+          marginBottom: '10px'
+        }}>
+          {COLOR_PALETTE.map((color) => (
+            <button
+              key={color}
+              onClick={() => handleColorSelect(color)}
+              style={{
+                width: '24px',
+                height: '24px',
+                backgroundColor: color,
+                border: `2px solid ${selectedColor === color ? (theme === 'dark' ? '#fff' : '#000') : 'transparent'}`,
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+              title={color}
+            />
+          ))}
+        </div>
+        
+        <div style={{ marginBottom: '10px', fontSize: '12px', fontWeight: 'bold' }}>
+          Line Width: {lineWidth}px
+        </div>
+        <input
+          type="range"
+          min="1"
+          max="10"
+          value={lineWidth}
+          onChange={(e) => handleLineWidthChange(parseInt(e.target.value))}
+          style={{ width: '100%' }}
+        />
+        
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          marginTop: '10px',
+          padding: '5px',
+          border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+          borderRadius: '4px',
+          background: selectedColor
+        }}>
+          <span style={{ 
+            color: parseInt(selectedColor.replace('#', ''), 16) > 0x7FFFFF ? '#000' : '#fff',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            flex: 1,
+            textAlign: 'center'
+          }}>
+            {selectedColor}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="drawing-tools">
-      <div className="tools">
+      <div className="tools" style={{ 
+        position: 'absolute', 
+        top: '10px', 
+        left: '10px', 
+        zIndex: 20,
+        background: theme === 'dark' ? '#2a2e39' : '#ffffff',
+        padding: '10px',
+        borderRadius: '4px',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '5px'
+      }}>
         <button 
           className={activeTool === 'line' ? 'active' : ''}
           onClick={() => onToolSelect(activeTool === 'line' ? null : 'line')}
+          style={{ 
+            margin: '0 2px', 
+            padding: '5px 8px',
+            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+            background: activeTool === 'line' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
+            color: theme === 'dark' ? '#fff' : '#000',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
         >
           Line
         </button>
         <button 
           className={activeTool === 'rectangle' ? 'active' : ''}
           onClick={() => onToolSelect(activeTool === 'rectangle' ? null : 'rectangle')}
+          style={{ 
+            margin: '0 2px', 
+            padding: '5px 8px',
+            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+            background: activeTool === 'rectangle' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
+            color: theme === 'dark' ? '#fff' : '#000',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
         >
           Rectangle
         </button>
         <button 
           className={activeTool === 'circle' ? 'active' : ''}
           onClick={() => onToolSelect(activeTool === 'circle' ? null : 'circle')}
+          style={{ 
+            margin: '0 2px', 
+            padding: '5px 8px',
+            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+            background: activeTool === 'circle' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
+            color: theme === 'dark' ? '#fff' : '#000',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
         >
           Circle
         </button>
         <button 
           className={activeTool === 'freehand' ? 'active' : ''}
           onClick={() => onToolSelect(activeTool === 'freehand' ? null : 'freehand')}
+          style={{ 
+            margin: '0 2px', 
+            padding: '5px 8px',
+            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+            background: activeTool === 'freehand' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
+            color: theme === 'dark' ? '#fff' : '#000',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
         >
           Pen
         </button>
         <button 
           className={activeTool === 'eraser' ? 'active' : ''}
           onClick={() => onToolSelect(activeTool === 'eraser' ? null : 'eraser')}
+          style={{ 
+            margin: '0 2px', 
+            padding: '5px 8px',
+            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+            background: activeTool === 'eraser' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
+            color: theme === 'dark' ? '#fff' : '#000',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
         >
           Eraser
         </button>
+        
+        {/* Color Picker Button */}
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <button 
+            onClick={() => setShowColorPicker(!showColorPicker)}
+            style={{ 
+              margin: '0 2px', 
+              padding: '5px 8px',
+              border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+              background: 'transparent',
+              color: theme === 'dark' ? '#fff' : '#000',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+          >
+            <div style={{
+              width: '16px',
+              height: '16px',
+              backgroundColor: selectedColor,
+              border: `1px solid ${theme === 'dark' ? '#fff' : '#000'}`,
+              borderRadius: '2px'
+            }} />
+            Color
+          </button>
+          {renderColorPicker()}
+        </div>
+        
+        {/* Line Width Display */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center',
+          marginLeft: '5px',
+          fontSize: '12px',
+          color: theme === 'dark' ? '#fff' : '#000'
+        }}>
+          <span>Width: {lineWidth}px</span>
+        </div>
       </div>
       
       {chartReady && (
@@ -435,8 +640,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
             width: chartDimensions.width,
             height: chartDimensions.height,
             cursor: activeTool ? 'crosshair' : 'default',
-            zIndex: 10, // Reduced from 100
-            backgroundColor: 'transparent'
+            zIndex: activeTool ? 15 : 1,
+            backgroundColor: 'transparent',
+            pointerEvents: activeTool ? 'auto' : 'none'
           }}
           onMouseDown={activeTool ? (activeTool === 'eraser' ? handleEraserClick : handleMouseDown) : undefined}
           onMouseMove={isDrawing ? handleMouseMove : undefined}
