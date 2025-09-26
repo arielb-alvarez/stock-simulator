@@ -45,9 +45,9 @@ const Home: React.FC = () => {
   return (
     <div className={`container ${config.theme}`}>
       <Head>
-        <title>Stock simulator - Trading chart</title>
+        <title>BTC/USDT Trading Chart</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="description" content="Stock simulator - Trading chart with drawing tools" />
+        <meta name="description" content="BTC/USDT Trading Chart" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
@@ -57,7 +57,7 @@ const Home: React.FC = () => {
           margin: '0 0 10px 0',
           textAlign: 'center' 
         }}>
-          Stock simulator
+          BTC/USDT Trading Chart
         </h1>
         <div className="connection-status">
           Status: {isConnected ? 'Connected' : 'Disconnected'}
