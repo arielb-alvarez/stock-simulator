@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Chart from '../components/Chart';
 import Toolbar from '../components/Toolbar';
@@ -16,6 +16,16 @@ const Home: React.FC = () => {
     ...chartConfig,
     type: 'candlestick'
   });
+
+  // Add useEffect to handle config changes properly
+  useEffect(() => {
+    // Force chart update when config changes
+    // This ensures the chart re-renders with new theme
+    if (candleData.length > 0) {
+      // The chart will receive new config prop and should update
+      saveChartConfig(config);
+    }
+  }, [config, candleData.length]); // Add dependencies
 
   const updateConfig = (newConfig: ChartConfig) => {
     setConfig(newConfig);
@@ -35,9 +45,9 @@ const Home: React.FC = () => {
   return (
     <div className={`container ${config.theme}`}>
       <Head>
-        <title>BTC/USDT TradingView-like App</title>
+        <title>Stock simulator - Trading chart</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="description" content="Real-time BTC/USDT trading chart with drawing tools" />
+        <meta name="description" content="Stock simulator - Trading chart with drawing tools" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
@@ -47,7 +57,7 @@ const Home: React.FC = () => {
           margin: '0 0 10px 0',
           textAlign: 'center' 
         }}>
-          BTC/USDT Trading Chart
+          Stock simulator
         </h1>
         <div className="connection-status">
           Status: {isConnected ? 'Connected' : 'Disconnected'}
@@ -67,6 +77,7 @@ const Home: React.FC = () => {
 
       <main className="chart-wrapper">
         <Chart 
+          key={`${config.theme}-${timeframe}`}
           data={candleData} 
           config={config}
           drawings={drawings}
