@@ -14,6 +14,7 @@ interface DrawingToolsProps {
   isChartReady: boolean;
   chartDimensions: { width: number; height: number };
   visibleRange: { from: number; to: number } | null;
+  isMobile: boolean;
 }
 
 const COLOR_PALETTE = [
@@ -21,6 +22,45 @@ const COLOR_PALETTE = [
   '#00FFFF', '#FFA500', '#800080', '#008000', '#000080',
   '#FFFFFF', '#000000', '#FFC0CB', '#A52A2A', '#808080',
 ];
+
+// Icon components
+const LineIcon = ({ color = 'currentColor', size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+    <line x1="3" y1="12" x2="21" y2="12" />
+  </svg>
+);
+
+const RectangleIcon = ({ color = 'currentColor', size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+  </svg>
+);
+
+const CircleIcon = ({ color = 'currentColor', size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+    <circle cx="12" cy="12" r="9" />
+  </svg>
+);
+
+const PenIcon = ({ color = 'currentColor', size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+  </svg>
+);
+
+const EraserIcon = ({ color = 'currentColor', size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+    <path d="M7 21l-5-5 5-5h12a2 2 0 0 1 0 4H7z" />
+  </svg>
+);
+
+const ColorPaletteIcon = ({ color = 'currentColor', size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+    <circle cx="9" cy="9" r="7" />
+    <circle cx="15" cy="15" r="7" />
+    <path d="M9 9l6 6" />
+  </svg>
+);
 
 const DrawingTools: React.FC<DrawingToolsProps> = ({
   activeTool,
@@ -32,7 +72,8 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   theme,
   isChartReady,
   chartDimensions,
-  visibleRange
+  visibleRange,
+  isMobile
 }) => {
   const [currentDrawing, setCurrentDrawing] = useState<Drawing | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -133,14 +174,12 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     return { x, y, time, price };
   }, [chartReady, safeCoordinateToTime, coordinateToPrice]);
 
-  // CRITICAL FIX: Improved mouse event handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!activeTool || activeTool === 'eraser' || !chartReady) return;
     
     const pos = getMousePosition(e);
     if (!pos) return;
 
-    // Prevent event propagation to allow drawing
     e.preventDefault();
     e.stopPropagation();
 
@@ -156,7 +195,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     };
     setCurrentDrawing(newDrawing);
     
-    // Force SVG re-render
     svgKeyRef.current++;
   }, [activeTool, chartReady, getMousePosition, selectedColor, lineWidth]);
 
@@ -172,13 +210,11 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     let updatedDrawing: Drawing;
 
     if (currentDrawing.type === 'freehand') {
-      // For freehand, keep adding points
       updatedDrawing = {
         ...currentDrawing,
         points: [...currentDrawing.points, { time: pos.time, price: pos.price }]
       };
     } else {
-      // For shapes, update the second point
       if (currentDrawing.points.length === 1) {
         updatedDrawing = {
           ...currentDrawing,
@@ -193,7 +229,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     }
 
     setCurrentDrawing(updatedDrawing);
-    // Force re-render on every mouse move
     svgKeyRef.current++;
   }, [isDrawing, currentDrawing, chartReady, getMousePosition]);
 
@@ -205,14 +240,12 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
 
     setIsDrawing(false);
 
-    // Only save if we have valid points
     if (currentDrawing.points && currentDrawing.points.length > 0) {
       const completedDrawing: Drawing = {
         ...currentDrawing,
         createdAt: Date.now()
       };
       
-      // Add the new drawing to the existing ones
       const updatedDrawings = [...drawings, completedDrawing];
       onDrawingsUpdate(updatedDrawings);
     }
@@ -446,8 +479,8 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
         ref={colorPickerRef}
         style={{
           position: 'absolute',
-          top: '50px',
-          left: '120px',
+          top: '0',
+          left: '50px', // Position to the right of the color button
           background: theme === 'dark' ? '#2a2e39' : '#ffffff',
           border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
           borderRadius: '8px',
@@ -520,165 +553,111 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
 
   return (
     <div className="drawing-tools">
-      {/* Toolbar */}
-      <div className="tools" style={{ 
-        position: 'absolute', 
-        top: '10px', 
-        left: '10px', 
-        zIndex: 100,
-        background: theme === 'dark' ? '#2a2e39' : '#ffffff',
-        padding: '10px',
-        borderRadius: '4px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '5px',
-        pointerEvents: 'auto'
-      }}>
+      <div 
+        className="tools-vertical"
+        style={{ 
+          background: theme === 'dark' ? 'rgba(42, 46, 57, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+          color: theme === 'dark' ? '#fff' : '#000',
+        }}
+      >
+        {/* Line Tool */}
         <button 
-          className={activeTool === 'line' ? 'active' : ''}
+          className={`tool-button ${activeTool === 'line' ? 'active' : ''}`}
           onClick={() => onToolSelect(activeTool === 'line' ? null : 'line')}
-          style={{ 
-            padding: '5px 8px',
-            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
-            background: activeTool === 'line' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
-            color: theme === 'dark' ? '#fff' : '#000',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
+          title="Line Tool"
         >
-          Line
-        </button>
-        <button 
-          className={activeTool === 'rectangle' ? 'active' : ''}
-          onClick={() => onToolSelect(activeTool === 'rectangle' ? null : 'rectangle')}
-          style={{ 
-            padding: '5px 8px',
-            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
-            background: activeTool === 'rectangle' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
-            color: theme === 'dark' ? '#fff' : '#000',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Rectangle
-        </button>
-        <button 
-          className={activeTool === 'circle' ? 'active' : ''}
-          onClick={() => onToolSelect(activeTool === 'circle' ? null : 'circle')}
-          style={{ 
-            padding: '5px 8px',
-            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
-            background: activeTool === 'circle' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
-            color: theme === 'dark' ? '#fff' : '#000',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Circle
-        </button>
-        <button 
-          className={activeTool === 'freehand' ? 'active' : ''}
-          onClick={() => onToolSelect(activeTool === 'freehand' ? null : 'freehand')}
-          style={{ 
-            padding: '5px 8px',
-            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
-            background: activeTool === 'freehand' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
-            color: theme === 'dark' ? '#fff' : '#000',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Pen
-        </button>
-        <button 
-          className={activeTool === 'eraser' ? 'active' : ''}
-          onClick={() => onToolSelect(activeTool === 'eraser' ? null : 'eraser')}
-          style={{ 
-            padding: '5px 8px',
-            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
-            background: activeTool === 'eraser' ? (theme === 'dark' ? '#555' : '#eee') : 'transparent',
-            color: theme === 'dark' ? '#fff' : '#000',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Eraser
+          <LineIcon color={activeTool === 'line' ? (theme === 'dark' ? '#fff' : '#000') : (theme === 'dark' ? '#ccc' : '#666')} />
         </button>
         
-        <div style={{ position: 'relative', display: 'inline-block' }}>
+        {/* Rectangle Tool */}
+        <button 
+          className={`tool-button ${activeTool === 'rectangle' ? 'active' : ''}`}
+          onClick={() => onToolSelect(activeTool === 'rectangle' ? null : 'rectangle')}
+          title="Rectangle Tool"
+        >
+          <RectangleIcon color={activeTool === 'rectangle' ? (theme === 'dark' ? '#fff' : '#000') : (theme === 'dark' ? '#ccc' : '#666')} />
+        </button>
+        
+        {/* Circle Tool */}
+        <button 
+          className={`tool-button ${activeTool === 'circle' ? 'active' : ''}`}
+          onClick={() => onToolSelect(activeTool === 'circle' ? null : 'circle')}
+          title="Circle Tool"
+        >
+          <CircleIcon color={activeTool === 'circle' ? (theme === 'dark' ? '#fff' : '#000') : (theme === 'dark' ? '#ccc' : '#666')} />
+        </button>
+        
+        {/* Freehand Tool */}
+        <button 
+          className={`tool-button ${activeTool === 'freehand' ? 'active' : ''}`}
+          onClick={() => onToolSelect(activeTool === 'freehand' ? null : 'freehand')}
+          title="Freehand Tool"
+        >
+          <PenIcon color={activeTool === 'freehand' ? (theme === 'dark' ? '#fff' : '#000') : (theme === 'dark' ? '#ccc' : '#666')} />
+        </button>
+        
+        {/* Eraser Tool */}
+        <button 
+          className={`tool-button ${activeTool === 'eraser' ? 'active' : ''}`}
+          onClick={() => onToolSelect(activeTool === 'eraser' ? null : 'eraser')}
+          title="Eraser Tool"
+        >
+          <EraserIcon color={activeTool === 'eraser' ? (theme === 'dark' ? '#fff' : '#000') : (theme === 'dark' ? '#ccc' : '#666')} />
+        </button>
+        
+        <div style={{ 
+          width: '100%', 
+          height: '1px', 
+          backgroundColor: theme === 'dark' ? '#444' : '#ccc',
+          margin: '4px 0'
+        }} />
+        
+        {/* Color Picker - This doesn't set an active tool */}
+        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
           <button 
+            className={`tool-button ${showColorPicker ? 'active' : ''}`}
             onClick={() => setShowColorPicker(!showColorPicker)}
-            style={{ 
-              padding: '5px 8px',
-              border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
-              background: 'transparent',
-              color: theme === 'dark' ? '#fff' : '#000',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}
+            title="Color Picker"
           >
-            <div style={{
-              width: '16px',
-              height: '16px',
-              backgroundColor: selectedColor,
-              border: `1px solid ${theme === 'dark' ? '#fff' : '#000'}`,
-              borderRadius: '2px'
-            }} />
-            Color
+            <ColorPaletteIcon color={showColorPicker ? (theme === 'dark' ? '#fff' : '#000') : (theme === 'dark' ? '#ccc' : '#666')} />
           </button>
-          {renderColorPicker()}
+          {showColorPicker && renderColorPicker()}
         </div>
         
         <div style={{ 
           display: 'flex', 
+          flexDirection: 'column',
           alignItems: 'center',
-          marginLeft: '5px',
-          fontSize: '12px',
-          color: theme === 'dark' ? '#fff' : '#000'
+          fontSize: '10px',
+          color: theme === 'dark' ? '#ccc' : '#666',
+          marginTop: '4px'
         }}>
-          <span>Width: {lineWidth}px</span>
+          <span>Width</span>
+          <span>{lineWidth}px</span>
         </div>
       </div>
       
-      {/* Drawing Layer - FIXED EVENT HANDLING */}
+      {/* Drawing Layer */}
       {chartReady && (
         <div 
           ref={drawingLayerRef}
+          className="drawing-surface"
           style={{ 
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: chartDimensions.width,
-            height: chartDimensions.height,
             cursor: isDrawing ? 'crosshair' : (activeTool ? 'crosshair' : 'default'),
             pointerEvents: activeTool && !showColorPicker ? 'auto' : 'none',
-            zIndex: 2,
-            backgroundColor: 'transparent'
           }}
           onMouseDown={activeTool ? (activeTool === 'eraser' ? handleEraserClick : handleMouseDown) : undefined}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
         >
-          {/* SVG for drawings - FIXED RE-RENDERING */}
           <svg
             width={chartDimensions.width}
             height={chartDimensions.height}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              pointerEvents: 'none'
-            }}
-            key={`drawings-${svgKeyRef.current}`} // Force re-render on every update
+            style={{ pointerEvents: 'none' }}
+            key={`drawings-${svgKeyRef.current}`}
           >
-            {/* Saved drawings */}
             {renderSavedDrawings()}
-            {/* Current drawing in progress */}
             {renderCurrentDrawing()}
           </svg>
         </div>

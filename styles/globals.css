@@ -1,3 +1,4 @@
+/* globals.css - Responsive Version */
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -11,12 +12,63 @@ body {
   box-sizing: border-box;
 }
 
+/* Responsive Chart Container */
 .chart-container {
   position: relative;
   width: 100%;
-  height: 500px;
+  height: 500px; /* Default height for desktop */
+  margin-left: 0; /* Remove fixed margin */
 }
 
+/* Mobile First Approach */
+@media (max-width: 768px) {
+  .chart-container {
+    height: 400px; /* Smaller height for mobile */
+    margin-left: 0;
+  }
+}
+
+@media (min-width: 1200px) {
+  .chart-container {
+    height: 600px; /* Larger height for big screens */
+  }
+}
+
+/* Header Responsive Styles */
+header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 0 10px;
+}
+
+@media (min-width: 768px) {
+  header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+  }
+}
+
+.connection-status {
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 14px;
+  color: white;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .connection-status {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+}
+
+/* Drawing Tools Responsive */
 .drawing-tools {
   position: absolute;
   top: 0;
@@ -26,232 +78,251 @@ body {
   z-index: 10;
 }
 
-.tools {
+/* Toolbar - Responsive positioning */
+.tools-vertical {
   position: absolute;
   top: 10px;
   left: 10px;
+  z-index: 100;
+  background: rgba(42, 46, 57, 0.9);
+  padding: 8px 5px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   display: flex;
-  gap: 10px;
-  z-index: 20;
-  padding: 10px;
-  background-color: rgba(0, 0, 0, 0.7);
-  border-radius: 5px;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  backdrop-filter: blur(10px);
 }
 
-.tools button {
-  padding: 8px 12px;
-  border: 1px solid #ccc;
-  background-color: #f8f8f8;
-  border-radius: 4px;
+/* Mobile toolbar - horizontal at bottom */
+@media (max-width: 768px) {
+  .tools-vertical {
+    top: auto;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: row;
+    padding: 5px 8px;
+    background: rgba(42, 46, 57, 0.95);
+  }
+}
+
+.tool-button {
+  width: 36px;
+  height: 36px;
+  padding: 6px;
+  border: 1px solid #444;
+  background: transparent;
+  color: #fff;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
 }
 
-.tools button:hover {
-  background-color: #e8e8e8;
+.tool-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
 }
 
-.tools button.active {
-  background-color: #2962FF;
-  color: white;
+.tool-button.active {
+  background: #2962FF;
   border-color: #2962FF;
 }
 
-/* Fix for chart interactivity */
-.tv-lightweight-charts {
-  position: relative;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-/* Ensure the chart container is properly sized */
-.tv-lightweight-charts > table {
-  width: 100% !important;
-  height: 100% !important;
-  border-spacing: 0;
-}
-
-/* Make sure the price scale and time scale are interactive */
-.tv-lightweight-charts .pane-legend {
-  z-index: 5;
-  pointer-events: auto !important;
-}
-
-/* Make sure the price scale is accessible */
-.tv-lightweight-charts .pane {
-  overflow: visible !important;
-  pointer-events: auto !important;
-}
-
-.tv-lightweight-charts .pane canvas {
+/* Color Picker Responsive */
+.color-picker-popup {
   position: absolute;
+  top: 0;
+  left: 50px;
+  background: #2a2e39;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 1000;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  min-width: 200px;
 }
 
-/* Fix for the right price scale */
-.tv-lightweight-charts .pane:last-child {
-  pointer-events: auto !important;
-  z-index: 5;
+@media (max-width: 768px) {
+  .color-picker-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 280px;
+    max-width: 90vw;
+  }
 }
 
-/* Fix for the time scale at the bottom */
-.tv-lightweight-charts .time-scale {
-  pointer-events: auto !important;
-  z-index: 5;
-  height: 25px !important;
+/* Main Container Responsive */
+.container {
+  padding: 15px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Ensure crosshair works properly */
-.tv-lightweight-charts .crosshair-line {
-  pointer-events: none;
+@media (min-width: 768px) {
+  .container {
+    padding: 20px;
+  }
 }
 
-/* Make sure the chart is properly sized and doesn't have hidden parts */
-.tv-lightweight-charts .pane {
-  position: relative;
-  overflow: visible !important;
+.container.dark {
+  background-color: #131722;
+  color: #D9D9D9;
 }
 
-/* Fix for the price scale labels */
-.tv-lightweight-charts .price-scale {
-  width: 70px !important;
-  pointer-events: auto !important;
+.container.light {
+  background-color: #FFFFFF;
+  color: #191919;
 }
 
-/* Ensure the chart is interactive */
-.tv-lightweight-charts .chart-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
-/* Make sure the drawing canvas doesn't interfere with chart interactions */
-.drawing-canvas {
-  pointer-events: none;
-  z-index: 10;
-}
-
-/* Container for the drawing tools that allows chart interactions */
+/* Chart wrapper for proper spacing */
 .chart-wrapper {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 15;
-}
-
-/* Ensure chart elements are accessible */
-.tv-lightweight-charts .price-scale,
-.tv-lightweight-charts .time-scale {
-  pointer-events: auto !important;
-}
-
-/* Fix for zoom and pan functionality */
-.tv-lightweight-charts .pane {
-  pointer-events: auto !important;
-}
-
-/* Make sure the chart receives mouse events */
-.tv-lightweight-charts {
-  pointer-events: auto !important;
-}
-
-/* Fix for the drawing canvas positioning */
-.chart-wrapper canvas {
-  pointer-events: none;
-}
-
-/* Make sure the chart container is interactive */
-.tv-lightweight-charts > div {
-  pointer-events: auto !important;
-}
-
-/* Fix for the price scale */
-.tv-lightweight-charts .price-scale {
-  pointer-events: auto !important;
-}
-
-/* Fix for the time scale */
-.tv-lightweight-charts .time-scale {
-  pointer-events: auto !important;
-}
-
-.drawing-tools {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 10;
-}
-
-.tools {
-  position: absolute;
-  top: 10px;
-  left: 10px;
+  flex: 1;
   display: flex;
-  gap: 10px;
-  z-index: 20;
-  padding: 10px;
-  background-color: rgba(0, 0, 0, 0.7);
-  border-radius: 5px;
+  flex-direction: column;
+  margin-left: 0; /* Remove fixed margin */
 }
 
-.tools button {
-  padding: 8px 12px;
-  border: 1px solid #ccc;
-  background-color: #f8f8f8;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.tools button:hover {
-  background-color: #e8e8e8;
-}
-
-.tools button.active {
-  background-color: #2962FF;
-  color: white;
-  border-color: #2962FF;
-}
-
-/* Ensure the chart container is interactive */
+/* Ensure chart elements are responsive */
 .tv-lightweight-charts {
   position: relative;
   width: 100% !important;
   height: 100% !important;
-  z-index: 5;
 }
 
-/* Make sure the price scale and time scale are interactive */
-.tv-lightweight-charts .pane-legend,
-.tv-lightweight-charts .price-scale,
-.tv-lightweight-charts .time-scale {
-  z-index: 6;
-  pointer-events: auto !important;
-}
-
-/* Drawing layer should not block chart interactions when no tool is active */
-.drawing-tools > div:last-child {
+/* Drawing layer responsive */
+.drawing-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
+  z-index: 2;
 }
 
-.drawing-tools > div:last-child:hover {
+.drawing-layer.interactive {
   pointer-events: auto;
 }
 
-/* When a tool is active, the drawing layer should capture events */
-.drawing-tools.has-active-tool > div:last-child {
-  pointer-events: auto;
+/* Toolbar component responsive */
+.toolbar-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  align-items: center;
 }
 
-/* SVG rendering for drawings */
+@media (max-width: 768px) {
+  .toolbar-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 15px;
+    padding: 10px;
+  }
+  
+  .toolbar-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+}
+
+/* Button responsive styles */
+.btn-responsive {
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: #f8f8f8;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .btn-responsive {
+    padding: 6px 12px;
+    font-size: 12px;
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.btn-responsive:hover {
+  background: #e8e8e8;
+}
+
+/* Select element responsive */
+.select-responsive {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: #f8f8f8;
+  font-size: 14px;
+  min-width: 120px;
+}
+
+@media (max-width: 768px) {
+  .select-responsive {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-width: 100px;
+    flex: 1;
+  }
+}
+
+/* Error message responsive */
+.error-message {
+  padding: 15px;
+  background-color: #2a2d3e;
+  border-radius: 4px;
+  text-align: center;
+  margin: 15px 0;
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .error-message {
+    padding: 10px;
+    margin: 10px 0;
+    font-size: 12px;
+  }
+}
+
+/* Ensure SVG drawings scale properly */
 .drawing-tools svg {
-  pointer-events: none;
+  vector-effect: non-scaling-stroke;
 }
 
-/* Add this class for when a tool is active */
-.chart-container.has-active-tool .drawing-tools > div:last-child {
-  pointer-events: auto;
+/* Touch improvements for mobile */
+@media (max-width: 768px) {
+  .tool-button {
+    width: 44px;
+    height: 44px;
+    padding: 8px;
+  }
+  
+  /* Improve touch targets */
+  .chart-container {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Prevent zoom on double-tap */
+  .drawing-tools {
+    touch-action: pan-x pan-y;
+  }
 }
