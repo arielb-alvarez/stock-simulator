@@ -1,4 +1,4 @@
-// DrawingTools.tsx - Replace the entire component with this fixed version
+// DrawingTools.tsx - Fixed version with real-time drawing
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { Drawing } from '../types';
@@ -22,22 +22,6 @@ const COLOR_PALETTE = [
   '#FFFFFF', '#000000', '#FFC0CB', '#A52A2A', '#808080',
 ];
 
-const useDebounce = (value: any, delay: number) => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-};
-
 const DrawingTools: React.FC<DrawingToolsProps> = ({
   activeTool,
   onToolSelect,
@@ -58,6 +42,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   const [lineWidth, setLineWidth] = useState(2);
   const drawingLayerRef = useRef<HTMLDivElement>(null);
   const colorPickerRef = useRef<HTMLDivElement>(null);
+  const svgKeyRef = useRef(0); // Force SVG re-renders
 
   // Safe chart access function
   const isChartValid = useCallback(() => {
@@ -92,25 +77,8 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
       const chartTime = (time / 1000) as UTCTimestamp;
       const coord = chart.timeScale().timeToCoordinate(chartTime);
       
-      // Check if coordinate is valid and within visible range
       if (coord === null || coord === undefined || isNaN(coord)) {
         return null;
-      }
-      
-      // Also check if the time is within the current visible time scale range
-      const timeScale = chart.timeScale();
-      const visibleRange = timeScale.getVisibleRange();
-      
-      if (visibleRange) {
-        const visibleFrom = (visibleRange.from as number) * 1000;
-        const visibleTo = (visibleRange.to as number) * 1000;
-        
-        // If time is outside visible range by a small margin, still render it
-        // This prevents drawings from disappearing during zoom/scroll
-        const buffer = (visibleTo - visibleFrom) * 0.1; // 10% buffer
-        if (time < visibleFrom - buffer || time > visibleTo + buffer) {
-          return null;
-        }
       }
       
       return coord;
@@ -137,9 +105,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
       const price = series!.coordinateToPrice(coordinate);
       return price !== null && !isNaN(price) ? price : null;
     } catch (error) {
-      if (!(chart as any)._internal_disposed) {
-        console.error('Error converting coordinate to price:', error);
-      }
       return null;
     }
   }, [series, isChartValid]);
@@ -150,14 +115,11 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
       const coord = series!.priceToCoordinate(price);
       return coord !== null && !isNaN(coord) ? coord : null;
     } catch (error) {
-      if (!(chart as any)._internal_disposed) {
-        console.error('Error converting price to coordinate:', error);
-      }
       return null;
     }
   }, [series, isChartValid]);
 
-  const getMousePosition = (e: React.MouseEvent) => {
+  const getMousePosition = useCallback((e: React.MouseEvent) => {
     if (!chartReady || !drawingLayerRef.current) return null;
     
     const rect = drawingLayerRef.current.getBoundingClientRect();
@@ -169,113 +131,97 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     if (time === null || price === null) return null;
     
     return { x, y, time, price };
-  };
+  }, [chartReady, safeCoordinateToTime, coordinateToPrice]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // CRITICAL FIX: Improved mouse event handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!activeTool || activeTool === 'eraser' || !chartReady) return;
-    
-    // Only prevent default for drawing tools, allow chart interactions otherwise
-    if (activeTool) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
     
     const pos = getMousePosition(e);
     if (!pos) return;
+
+    // Prevent event propagation to allow drawing
+    e.preventDefault();
+    e.stopPropagation();
 
     setIsDrawing(true);
 
     const newDrawing: Drawing = {
-      id: Date.now().toString(),
+      id: `drawing-${Date.now()}`,
       type: activeTool as any,
       points: [{ time: pos.time, price: pos.price }],
       color: selectedColor,
-      width: lineWidth
+      width: lineWidth,
+      createdAt: Date.now()
     };
     setCurrentDrawing(newDrawing);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    // Only interfere if we're actively drawing
-    if (!isDrawing || !currentDrawing || !chartReady) return;
     
-    e.preventDefault();
-    e.stopPropagation();
+    // Force SVG re-render
+    svgKeyRef.current++;
+  }, [activeTool, chartReady, getMousePosition, selectedColor, lineWidth]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDrawing || !currentDrawing || !chartReady) return;
     
     const pos = getMousePosition(e);
     if (!pos) return;
 
+    e.preventDefault();
+    e.stopPropagation();
+
+    let updatedDrawing: Drawing;
+
     if (currentDrawing.type === 'freehand') {
-      const updatedDrawing = {
+      // For freehand, keep adding points
+      updatedDrawing = {
         ...currentDrawing,
         points: [...currentDrawing.points, { time: pos.time, price: pos.price }]
       };
-      setCurrentDrawing(updatedDrawing);
-    } else if (currentDrawing.points.length === 1) {
-      const updatedDrawing = {
-        ...currentDrawing,
-        points: [...currentDrawing.points, { time: pos.time, price: pos.price }]
-      };
-      setCurrentDrawing(updatedDrawing);
-    } else if (currentDrawing.points.length === 2) {
-      const updatedDrawing = {
-        ...currentDrawing,
-        points: [currentDrawing.points[0], { time: pos.time, price: pos.price }]
-      };
-      setCurrentDrawing(updatedDrawing);
-    }
-  };
-
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (!currentDrawing) return;
-    
-    if (isDrawing) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
-    setIsDrawing(false);
-
-    if (currentDrawing.points && currentDrawing.points.length > 0) {
-      let completedDrawing: Drawing;
-      
-      if (currentDrawing.type !== 'freehand' && currentDrawing.points.length === 1) {
-        // For shapes that need exactly 2 points but user only clicked once
-        completedDrawing = {
+    } else {
+      // For shapes, update the second point
+      if (currentDrawing.points.length === 1) {
+        updatedDrawing = {
           ...currentDrawing,
-          points: [currentDrawing.points[0], currentDrawing.points[0]], // Duplicate point
-          createdAt: Date.now()
+          points: [currentDrawing.points[0], { time: pos.time, price: pos.price }]
         };
       } else {
-        completedDrawing = {
+        updatedDrawing = {
           ...currentDrawing,
-          createdAt: Date.now()
+          points: [currentDrawing.points[0], { time: pos.time, price: pos.price }]
         };
       }
+    }
+
+    setCurrentDrawing(updatedDrawing);
+    // Force re-render on every mouse move
+    svgKeyRef.current++;
+  }, [isDrawing, currentDrawing, chartReady, getMousePosition]);
+
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    if (!isDrawing || !currentDrawing) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    setIsDrawing(false);
+
+    // Only save if we have valid points
+    if (currentDrawing.points && currentDrawing.points.length > 0) {
+      const completedDrawing: Drawing = {
+        ...currentDrawing,
+        createdAt: Date.now()
+      };
       
-      // Add the new drawing to the existing ones and save
+      // Add the new drawing to the existing ones
       const updatedDrawings = [...drawings, completedDrawing];
       onDrawingsUpdate(updatedDrawings);
     }
     
     setCurrentDrawing(null);
-  };
+    svgKeyRef.current++;
+  }, [isDrawing, currentDrawing, drawings, onDrawingsUpdate]);
 
-  const handleDrawingUpdate = (updatedDrawings: Drawing[]) => {
-    // Filter out any invalid drawings before saving
-    const validDrawings = updatedDrawings.filter(drawing => 
-      drawing && 
-      drawing.id && 
-      drawing.type && 
-      drawing.points && 
-      Array.isArray(drawing.points) &&
-      drawing.points.length > 0
-    );
-    
-    onDrawingsUpdate(validDrawings);
-  };
-
-  const handleEraserClick = (e: React.MouseEvent) => {
+  const handleEraserClick = useCallback((e: React.MouseEvent) => {
     if (activeTool !== 'eraser' || !chartReady) return;
     
     e.preventDefault();
@@ -287,7 +233,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     const updatedDrawings = drawings.filter(drawing => {
       if (!drawing.points) return false;
       
-      // Check if any point in the drawing is near the click position
       const isNear = drawing.points.some(point => {
         const pointX = safeTimeToCoordinate(point.time);
         const pointY = priceToCoordinate(point.price);
@@ -295,11 +240,11 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
               Math.abs(pointX - pos.x) < 10 && Math.abs(pointY - pos.y) < 10;
       });
       
-      return !isNear; // Keep drawings that are NOT near the click
+      return !isNear;
     });
     
-    handleDrawingUpdate(updatedDrawings);
-  };
+    onDrawingsUpdate(updatedDrawings);
+  }, [activeTool, chartReady, getMousePosition, drawings, onDrawingsUpdate, safeTimeToCoordinate, priceToCoordinate]);
 
   const handleColorSelect = (color: string) => {
     setSelectedColor(color);
@@ -310,174 +255,188 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
     setLineWidth(width);
   };
 
-  // Debounce chart dimensions and visible range to prevent excessive re-renders
-  const debouncedDimensions = useDebounce(chartDimensions, 100);
-  const debouncedVisibleRange = useDebounce(visibleRange, 150);
+  // Render current drawing in real-time
+  const renderCurrentDrawing = useCallback(() => {
+    if (!currentDrawing || !currentDrawing.points || currentDrawing.points.length === 0) {
+      return null;
+    }
 
-  const renderDrawings = useCallback(() => {
+    try {
+      const coordinates = currentDrawing.points.map(point => ({
+        x: safeTimeToCoordinate(point.time) || 0,
+        y: priceToCoordinate(point.price) || 0
+      })).filter(coord => coord.x !== null && coord.y !== null);
+
+      if (coordinates.length === 0) return null;
+
+      switch (currentDrawing.type) {
+        case 'freehand':
+          if (coordinates.length < 2) return null;
+          return (
+            <polyline
+              key="current-freehand"
+              points={coordinates.map(coord => `${coord.x},${coord.y}`).join(' ')}
+              stroke={currentDrawing.color}
+              strokeWidth={currentDrawing.width}
+              fill="none"
+              vectorEffect="non-scaling-stroke"
+            />
+          );
+          
+        case 'line':
+          if (coordinates.length < 2) return null;
+          return (
+            <line
+              key="current-line"
+              x1={coordinates[0].x}
+              y1={coordinates[0].y}
+              x2={coordinates[1].x}
+              y2={coordinates[1].y}
+              stroke={currentDrawing.color}
+              strokeWidth={currentDrawing.width}
+              vectorEffect="non-scaling-stroke"
+            />
+          );
+          
+        case 'rectangle':
+          if (coordinates.length < 2) return null;
+          return (
+            <rect
+              key="current-rect"
+              x={Math.min(coordinates[0].x, coordinates[1].x)}
+              y={Math.min(coordinates[0].y, coordinates[1].y)}
+              width={Math.abs(coordinates[1].x - coordinates[0].x)}
+              height={Math.abs(coordinates[1].y - coordinates[0].y)}
+              stroke={currentDrawing.color}
+              strokeWidth={currentDrawing.width}
+              fill="none"
+              vectorEffect="non-scaling-stroke"
+            />
+          );
+          
+        case 'circle':
+          if (coordinates.length < 2) return null;
+          return (
+            <circle
+              key="current-circle"
+              cx={coordinates[0].x}
+              cy={coordinates[0].y}
+              r={Math.sqrt(
+                Math.pow(coordinates[1].x - coordinates[0].x, 2) + 
+                Math.pow(coordinates[1].y - coordinates[0].y, 2)
+              )}
+              stroke={currentDrawing.color}
+              strokeWidth={currentDrawing.width}
+              fill="none"
+              vectorEffect="non-scaling-stroke"
+            />
+          );
+          
+        default:
+          return null;
+      }
+    } catch (error) {
+      console.warn('Error rendering current drawing:', error);
+      return null;
+    }
+  }, [currentDrawing, safeTimeToCoordinate, priceToCoordinate]);
+
+  // Render saved drawings
+  const renderSavedDrawings = useCallback(() => {
     if (!chartReady || chartDimensions.width === 0 || chartDimensions.height === 0) {
       return null;
     }
 
-    // Filter and validate drawings more robustly
     const validDrawings = drawings.filter(drawing => 
       drawing && 
       drawing.id && 
       drawing.type && 
       drawing.points && 
       Array.isArray(drawing.points) &&
-      drawing.points.length > 0 &&
-      drawing.points.every(point => 
-        point && 
-        point.time !== undefined && 
-        point.price !== undefined &&
-        !isNaN(point.time) && 
-        !isNaN(point.price) &&
-        point.time > 0 && // Ensure time is positive
-        point.price > 0   // Ensure price is positive
-      )
+      drawing.points.length > 0
     );
 
-    return (
-      <svg
-        width={chartDimensions.width}
-        height={chartDimensions.height}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          pointerEvents: 'none'
-        }}
-        key={`drawings-${chartDimensions.width}-${chartDimensions.height}-${Date.now()}`} // More reliable key
-      >
-        {validDrawings.map(drawing => {
-          try {
-            // Convert all points to current coordinate system
-            const coordinates = drawing.points.map(point => ({
-              x: safeTimeToCoordinate(point.time),
-              y: priceToCoordinate(point.price)
-            }));
-            
-            // Filter out points that are not currently visible but keep at least 2 points for shapes
-            const validCoordinates = coordinates.filter(coord => 
-              coord.x !== null && coord.y !== null && 
-              !isNaN(coord.x!) && !isNaN(coord.y!)
+    return validDrawings.map(drawing => {
+      try {
+        const coordinates = drawing.points.map(point => ({
+          x: safeTimeToCoordinate(point.time),
+          y: priceToCoordinate(point.price)
+        })).filter(coord => coord.x !== null && coord.y !== null) as {x: number, y: number}[];
+
+        if (coordinates.length === 0) return null;
+
+        switch (drawing.type) {
+          case 'freehand':
+            if (coordinates.length < 2) return null;
+            return (
+              <polyline
+                key={drawing.id}
+                points={coordinates.map(coord => `${coord.x},${coord.y}`).join(' ')}
+                stroke={drawing.color}
+                strokeWidth={drawing.width}
+                fill="none"
+                vectorEffect="non-scaling-stroke"
+              />
             );
             
-            if (validCoordinates.length === 0) {
-              return null;
-            }
+          case 'line':
+            if (coordinates.length < 2) return null;
+            return (
+              <line
+                key={drawing.id}
+                x1={coordinates[0].x}
+                y1={coordinates[0].y}
+                x2={coordinates[1].x}
+                y2={coordinates[1].y}
+                stroke={drawing.color}
+                strokeWidth={drawing.width}
+                vectorEffect="non-scaling-stroke"
+              />
+            );
             
-            // For shapes that need exactly 2 points, ensure we have enough coordinates
-            if ((drawing.type === 'line' || drawing.type === 'rectangle' || drawing.type === 'circle') && 
-                validCoordinates.length < 2) {
-              // If we don't have enough points, try to use the original points with fallback
-              const fallbackCoords = coordinates.map(coord => ({
-                x: coord.x || 0,
-                y: coord.y || 0
-              }));
-              
-              if (fallbackCoords.length >= 2) {
-                return renderDrawingShape(drawing, fallbackCoords);
-              }
-              return null;
-            }
+          case 'rectangle':
+            if (coordinates.length < 2) return null;
+            return (
+              <rect
+                key={drawing.id}
+                x={Math.min(coordinates[0].x, coordinates[1].x)}
+                y={Math.min(coordinates[0].y, coordinates[1].y)}
+                width={Math.abs(coordinates[1].x - coordinates[0].x)}
+                height={Math.abs(coordinates[1].y - coordinates[0].y)}
+                stroke={drawing.color}
+                strokeWidth={drawing.width}
+                fill="none"
+                vectorEffect="non-scaling-stroke"
+              />
+            );
             
-            return renderDrawingShape(drawing, validCoordinates as {x: number, y: number}[]);
-          } catch (error) {
-            console.warn('Error rendering drawing:', error);
+          case 'circle':
+            if (coordinates.length < 2) return null;
+            return (
+              <circle
+                key={drawing.id}
+                cx={coordinates[0].x}
+                cy={coordinates[0].y}
+                r={Math.sqrt(
+                  Math.pow(coordinates[1].x - coordinates[0].x, 2) + 
+                  Math.pow(coordinates[1].y - coordinates[0].y, 2)
+                )}
+                stroke={drawing.color}
+                strokeWidth={drawing.width}
+                fill="none"
+                vectorEffect="non-scaling-stroke"
+              />
+            );
+            
+          default:
             return null;
-          }
-        })}
-        
-        {/* Current drawing in progress */}
-        {currentDrawing && renderCurrentDrawing()}
-      </svg>
-    );
-  }, [debouncedDimensions, debouncedVisibleRange, drawings, chartReady, isChartValid]);
-
-  // helper function for rendering drawing shapes
-  const renderDrawingShape = (drawing: Drawing, coordinates: {x: number, y: number}[]) => {
-    switch (drawing.type) {
-      case 'freehand':
-        return (
-          <polyline
-            key={drawing.id}
-            points={coordinates.map(coord => `${coord.x},${coord.y}`).join(' ')}
-            stroke={drawing.color}
-            strokeWidth={drawing.width}
-            fill="none"
-            vectorEffect="non-scaling-stroke"
-          />
-        );
-        
-      case 'line':
-        return (
-          <line
-            key={drawing.id}
-            x1={coordinates[0].x}
-            y1={coordinates[0].y}
-            x2={coordinates[coordinates.length - 1].x}
-            y2={coordinates[coordinates.length - 1].y}
-            stroke={drawing.color}
-            strokeWidth={drawing.width}
-            vectorEffect="non-scaling-stroke"
-          />
-        );
-        
-      case 'rectangle':
-        return (
-          <rect
-            key={drawing.id}
-            x={Math.min(coordinates[0].x, coordinates[1].x)}
-            y={Math.min(coordinates[0].y, coordinates[1].y)}
-            width={Math.abs(coordinates[1].x - coordinates[0].x)}
-            height={Math.abs(coordinates[1].y - coordinates[0].y)}
-            stroke={drawing.color}
-            strokeWidth={drawing.width}
-            fill="none"
-            vectorEffect="non-scaling-stroke"
-          />
-        );
-        
-      case 'circle':
-        return (
-          <circle
-            key={drawing.id}
-            cx={coordinates[0].x}
-            cy={coordinates[0].y}
-            r={Math.sqrt(
-              Math.pow(coordinates[1].x - coordinates[0].x, 2) + 
-              Math.pow(coordinates[1].y - coordinates[0].y, 2)
-            )}
-            stroke={drawing.color}
-            strokeWidth={drawing.width}
-            fill="none"
-            vectorEffect="non-scaling-stroke"
-          />
-        );
-        
-      default:
+        }
+      } catch (error) {
+        console.warn('Error rendering drawing:', error);
         return null;
-    }
-  };
-
-  // helper function for rendering current drawing
-  const renderCurrentDrawing = () => {
-    if (!currentDrawing || !currentDrawing.points || currentDrawing.points.length === 0) {
-      return null;
-    }
-
-    const coordinates = currentDrawing.points.map(point => ({
-      x: safeTimeToCoordinate(point.time) || 0,
-      y: priceToCoordinate(point.price) || 0
-    }));
-
-    return renderDrawingShape(
-      { ...currentDrawing, id: 'current' }, 
-      coordinates
-    );
-  };
+      }
+    });
+  }, [drawings, chartReady, chartDimensions, safeTimeToCoordinate, priceToCoordinate]);
 
   const renderColorPicker = () => {
     if (!showColorPicker) return null;
@@ -493,7 +452,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
           borderRadius: '8px',
           padding: '10px',
-          zIndex: 1000, // Very high z-index to ensure it's above everything
+          zIndex: 1000,
           boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
           minWidth: '200px'
         }}
@@ -685,7 +644,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
         </div>
       </div>
       
-      {/* Drawing Layer - CRITICAL FIXES */}
+      {/* Drawing Layer - FIXED EVENT HANDLING */}
       {chartReady && (
         <div 
           ref={drawingLayerRef}
@@ -695,17 +654,33 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
             left: 0,
             width: chartDimensions.width,
             height: chartDimensions.height,
-            cursor: isDrawing ? 'crosshair' : 'default',
+            cursor: isDrawing ? 'crosshair' : (activeTool ? 'crosshair' : 'default'),
             pointerEvents: activeTool && !showColorPicker ? 'auto' : 'none',
             zIndex: 2,
             backgroundColor: 'transparent'
           }}
           onMouseDown={activeTool ? (activeTool === 'eraser' ? handleEraserClick : handleMouseDown) : undefined}
-          onMouseMove={isDrawing ? handleMouseMove : undefined}
-          onMouseUp={isDrawing ? handleMouseUp : undefined}
-          onMouseLeave={isDrawing ? handleMouseUp : undefined}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
         >
-          {renderDrawings()}
+          {/* SVG for drawings - FIXED RE-RENDERING */}
+          <svg
+            width={chartDimensions.width}
+            height={chartDimensions.height}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              pointerEvents: 'none'
+            }}
+            key={`drawings-${svgKeyRef.current}`} // Force re-render on every update
+          >
+            {/* Saved drawings */}
+            {renderSavedDrawings()}
+            {/* Current drawing in progress */}
+            {renderCurrentDrawing()}
+          </svg>
         </div>
       )}
     </div>
