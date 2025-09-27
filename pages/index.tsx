@@ -5,6 +5,46 @@ import useCryptoData from '../hooks/useCryptoData';
 import useCookies from '../hooks/useCookies';
 import { ChartConfig } from '../types';
 
+// SVG Icon Components
+const SunIcon = ({ color = 'currentColor', size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+    <circle cx="12" cy="12" r="5"/>
+    <line x1="12" y1="1" x2="12" y2="3"/>
+    <line x1="12" y1="21" x2="12" y2="23"/>
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+    <line x1="1" y1="12" x2="3" y2="12"/>
+    <line x1="21" y1="12" x2="23" y2="12"/>
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+  </svg>
+);
+
+const MoonIcon = ({ color = 'currentColor', size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </svg>
+);
+
+const ClearIcon = ({ color = 'currentColor', size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+    <line x1="10" y1="11" x2="10" y2="17"/>
+    <line x1="14" y1="11" x2="14" y2="17"/>
+  </svg>
+);
+
+const ConnectionDotIcon = ({ connected = true, size = 6 }) => (
+  <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+    <circle 
+      cx={size/2} 
+      cy={size/2} 
+      r={size/2} 
+      fill={connected ? '#10B981' : '#EF4444'}
+    />
+  </svg>
+);
+
 const Home: React.FC = () => {
   const [timeframe, setTimeframe] = useState('5m');
   const { candleData, isConnected, error, dataSource } = useCryptoData('btcusdt', timeframe);
@@ -58,7 +98,7 @@ const Home: React.FC = () => {
         <div className="header-left">
           <h1 className="chart-title">BTC/USDT</h1>
           <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
-            <span className="status-dot"></span>
+            <ConnectionDotIcon connected={isConnected} />
             {isConnected ? 'Live' : 'Offline'}
           </div>
         </div>
@@ -83,7 +123,8 @@ const Home: React.FC = () => {
             onClick={handleClearDrawings}
             title="Clear Drawings"
           >
-            Clear
+            <ClearIcon color="white" />
+            <span>Clear</span>
           </button>
           
           <div className="theme-selector">
@@ -92,14 +133,14 @@ const Home: React.FC = () => {
               onClick={() => updateConfig({ ...config, theme: 'light' })}
               title="Light theme"
             >
-              ☀️
+              <SunIcon color={config.theme === 'light' ? '#2563EB' : (config.theme === 'dark' ? '#9CA3AF' : '#6B7280')} />
             </button>
             <button
               className={`theme-btn ${config.theme === 'dark' ? 'active' : ''}`}
               onClick={() => updateConfig({ ...config, theme: 'dark' })}
               title="Dark theme"
             >
-              🌙
+              <MoonIcon color={config.theme === 'dark' ? '#2563EB' : '#6B7280'} />
             </button>
           </div>
         </div>
@@ -234,6 +275,9 @@ const Home: React.FC = () => {
         }
 
         .clear-btn {
+          display: flex;
+          align-items: center;
+          gap: 4px;
           padding: 3px 8px;
           border: none;
           background: ${config.theme === 'dark' ? '#EF4444' : '#DC2626'};
@@ -266,6 +310,9 @@ const Home: React.FC = () => {
           cursor: pointer;
           font-size: 0.7rem;
           transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .theme-btn:hover {
@@ -329,6 +376,14 @@ const Home: React.FC = () => {
           .timeframe-btn {
             padding: 4px 8px;
             font-size: 0.65rem;
+          }
+
+          .clear-btn span {
+            display: none;
+          }
+
+          .clear-btn {
+            padding: 4px;
           }
         }
 

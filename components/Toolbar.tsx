@@ -9,6 +9,27 @@ interface ToolbarProps {
   onClearDrawings?: () => void;
 }
 
+// SVG Icon components matching DrawingTools style
+const SunIcon = ({ color = 'currentColor', size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+    <circle cx="12" cy="12" r="5" />
+    <line x1="12" y1="1" x2="12" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="23" />
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+    <line x1="1" y1="12" x2="3" y2="12" />
+    <line x1="21" y1="12" x2="23" y2="12" />
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+  </svg>
+);
+
+const MoonIcon = ({ color = 'currentColor', size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+  </svg>
+);
+
 const Toolbar: React.FC<ToolbarProps> = ({ 
   config, 
   onConfigChange, 
@@ -47,8 +68,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
   ];
 
   const themes = [
-    { value: 'light', label: 'Light', icon: '☀️' },
-    { value: 'dark', label: 'Dark', icon: '🌙' }
+    { value: 'light', label: 'Light', icon: 'sun' },
+    { value: 'dark', label: 'Dark', icon: 'moon' }
   ];
 
   const renderTimeframeSelector = () => {
@@ -107,14 +128,14 @@ const Toolbar: React.FC<ToolbarProps> = ({
           onClick={() => updateConfig({ theme: 'light' })}
           title="Light theme"
         >
-          ☀️
+          <SunIcon color={config.theme === 'light' ? '#2563EB' : (config.theme === 'dark' ? '#9CA3AF' : '#6B7280')} />
         </button>
         <button
           className={`theme-btn ${config.theme === 'dark' ? 'active' : ''}`}
           onClick={() => updateConfig({ theme: 'dark' })}
           title="Dark theme"
         >
-          🌙
+          <MoonIcon color={config.theme === 'dark' ? '#2563EB' : '#6B7280'} />
         </button>
       </div>
     );
@@ -195,13 +216,18 @@ const Toolbar: React.FC<ToolbarProps> = ({
         }
         
         .theme-btn {
-          padding: 6px 10px;
+          padding: 6px 8px;
           border: none;
           background: transparent;
           border-radius: 4px;
           cursor: pointer;
           font-size: 14px;
           transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 28px;
         }
         
         .theme-btn:hover {
@@ -261,6 +287,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
           .clear-btn {
             padding: 6px 10px;
             font-size: 12px;
+          }
+
+          .theme-btn {
+            width: 28px;
+            height: 24px;
+            padding: 4px;
           }
         }
       `}</style>

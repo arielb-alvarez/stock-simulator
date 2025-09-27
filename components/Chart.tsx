@@ -1,4 +1,3 @@
-// Chart.tsx - Fixed layout version
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { CandleStickData, Drawing, ChartConfig } from '../types';

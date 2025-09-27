@@ -1,4 +1,3 @@
-// DrawingTools.tsx - Fixed version with real-time drawing
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { Drawing } from '../types';
