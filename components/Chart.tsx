@@ -1,4 +1,3 @@
-// Chart.tsx - Responsive version
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { CandleStickData, Drawing, ChartConfig } from '../types';
@@ -304,7 +303,7 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
             width: '100%', 
             height: '100%', 
             position: 'relative',
-            minHeight: isMobile ? '300px' : '400px'
+            minHeight: '400px'
           }} 
         />
         {isChartReady && isChartValid() && (

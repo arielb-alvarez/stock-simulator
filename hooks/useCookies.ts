@@ -5,7 +5,7 @@ import { Drawing, ChartConfig } from '../types';
 const useCookies = () => {
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [chartConfig, setChartConfig] = useState<ChartConfig>({
-    theme: 'dark',
+    theme: 'light',
     type: 'candlestick'
   });
 
