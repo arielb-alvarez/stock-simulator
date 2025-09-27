@@ -556,8 +556,21 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
       <div 
         className="tools-vertical"
         style={{ 
+          position: 'absolute',
+          top: '10px',
+          left: '10px', // Changed from right to left
+          zIndex: 100,
           background: theme === 'dark' ? 'rgba(42, 46, 57, 0.95)' : 'rgba(255, 255, 255, 0.95)',
           color: theme === 'dark' ? '#fff' : '#000',
+          padding: '8px 5px',
+          borderRadius: '8px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '8px',
+          pointerEvents: 'auto',
+          backdropFilter: 'blur(10px)',
         }}
       >
         {/* Line Tool */}
