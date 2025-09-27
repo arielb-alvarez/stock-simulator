@@ -36,15 +36,22 @@ const Home: React.FC = () => {
     <div className={`container ${config.theme}`}>
       <Head>
         <title>BTC/USDT TradingView-like App</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="description" content="Real-time BTC/USDT trading chart with drawing tools" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
       <header>
-        <h1>BTC/USDT Trading Chart</h1>
+        <h1 style={{ 
+          fontSize: 'clamp(1.5rem, 4vw, 2rem)', 
+          margin: '0 0 10px 0',
+          textAlign: 'center' 
+        }}>
+          BTC/USDT Trading Chart
+        </h1>
         <div className="connection-status">
           Status: {isConnected ? 'Connected' : 'Disconnected'}
-          {timeframe && ` | Timeframe: ${timeframe}`}
+          {timeframe && ` | TF: ${timeframe}`}
           {dataSource && ` | Source: ${dataSource}`}
           {error && ` | Error: ${error}`}
         </div>
@@ -58,7 +65,7 @@ const Home: React.FC = () => {
         onClearDrawings={handleClearDrawings}
       />
 
-      <main>
+      <main className="chart-wrapper">
         <Chart 
           data={candleData} 
           config={config}
@@ -67,50 +74,6 @@ const Home: React.FC = () => {
           timeframe={timeframe}
         />
       </main>
-
-      <style jsx>{`
-        .container {
-          padding: 20px;
-          min-height: 100vh;
-        }
-        
-        .container.dark {
-          background-color: #131722;
-          color: #D9D9D9;
-        }
-        
-        .container.light {
-          background-color: #FFFFFF;
-          color: #191919;
-        }
-        
-        header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-        }
-        
-        .connection-status {
-          padding: 5px 10px;
-          border-radius: 4px;
-          font-weight: bold;
-          background-color: ${isConnected ? '#4CAF50' : '#F44336'};
-          color: white;
-        }
-        
-        .error-message {
-          padding: 20px;
-          background-color: ${config.theme === 'dark' ? '#2a2d3e' : '#f8f8f8'};
-          border-radius: 4px;
-          text-align: center;
-          margin: 20px 0;
-        }
-        
-        .error-message p {
-          margin: 10px 0;
-        }
-      `}</style>
     </div>
   );
 };

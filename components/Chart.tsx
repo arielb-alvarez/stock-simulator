@@ -1,4 +1,4 @@
-// Chart.tsx - Fixed version with proper cleanup
+// Chart.tsx - Responsive version
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { CandleStickData, Drawing, ChartConfig } from '../types';
@@ -43,6 +43,7 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
   const [isChartReady, setIsChartReady] = useState(false);
   const [chartDimensions, setChartDimensions] = useState({ width: 0, height: 0 });
   const [visibleRange, setVisibleRange] = useState<{ from: number; to: number } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Track if chart is disposed using a ref
   const isChartDisposed = useRef(false);
@@ -52,6 +53,18 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
     handleVisibleRangeChange: (() => void) | null;
     handleResize: (() => void) | null;
   }>({ handleVisibleRangeChange: null, handleResize: null });
+
+  // Check for mobile view
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Function to check if chart is still valid
   const isChartValid = useCallback(() => {
@@ -72,24 +85,29 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
         });
       }
     } catch (error) {
-      // If we get an error, the chart might be disposed
       if (!isChartValid()) {
         console.error('Error getting visible range:', error);
       }
     }
   }, [isChartValid]);
 
+  // Initialize chart
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
     // Reset disposal flag
     isChartDisposed.current = false;
 
-    // Initialize chart with proper interactivity options
+    // Get container dimensions
+    const containerWidth = chartContainerRef.current.clientWidth;
+    const containerHeight = chartContainerRef.current.clientHeight;
+
+    // Initialize chart with responsive options
     chart.current = createChart(chartContainerRef.current, {
       layout: {
         backgroundColor: config.theme === 'dark' ? '#131722' : '#FFFFFF',
         textColor: config.theme === 'dark' ? '#D9D9D9' : '#191919',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       },
       grid: {
         vertLines: {
@@ -99,31 +117,31 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
           color: config.theme === 'dark' ? '#334158' : '#D6DCDE',
         },
       },
-      width: chartContainerRef.current.clientWidth,
-      height: 500,
+      width: containerWidth,
+      height: containerHeight,
       timeScale: {
         timeVisible: true,
         secondsVisible: false,
         borderColor: config.theme === 'dark' ? '#334158' : '#D6DCDE',
         rightOffset: 0,
-        barSpacing: 6,
+        barSpacing: isMobile ? 4 : 6,
         minBarSpacing: 1,
         fixLeftEdge: false,
         fixRightEdge: false,
-        lockVisibleTimeRangeOnResize: false,
+        lockVisibleTimeRangeOnResize: true,
       },
       crosshair: {
         mode: 1,
       },
       handleScroll: {
-        mouseWheel: true,
+        mouseWheel: !isMobile,
         pressedMouseMove: true,
         horzTouchDrag: true,
         vertTouchDrag: false,
       },
       handleScale: {
         axisPressedMouseMove: true,
-        mouseWheel: true,
+        mouseWheel: !isMobile,
         pinch: true,
         axisDoubleClickReset: true,
         doubleClick: true,
@@ -149,15 +167,18 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
     };
 
     const handleResize = () => {
-      if (isChartValid()) {
+      if (isChartValid() && chartContainerRef.current) {
+        const newWidth = chartContainerRef.current.clientWidth;
+        const newHeight = chartContainerRef.current.clientHeight;
+        
         chart.current!.applyOptions({
-          width: chartContainerRef.current!.clientWidth,
+          width: newWidth,
+          height: newHeight,
         });
         
-        const chartElement = chart.current!.chartElement();
         setChartDimensions({
-          width: chartElement.clientWidth,
-          height: chartElement.clientHeight
+          width: newWidth,
+          height: newHeight
         });
       }
       updateVisibleRange();
@@ -179,10 +200,9 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
         setIsChartReady(true);
         updateVisibleRange();
         
-        const chartElement = chart.current!.chartElement();
         setChartDimensions({
-          width: chartElement.clientWidth,
-          height: chartElement.clientHeight
+          width: containerWidth,
+          height: containerHeight
         });
       }
     }, 300);
@@ -212,7 +232,6 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
           
           chart.current.remove();
         } catch (error) {
-          // Ignore disposal errors
           console.warn('Error during chart cleanup:', error);
         }
       }
@@ -220,8 +239,9 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
       setIsChartReady(false);
       handlersRef.current = { handleVisibleRangeChange: null, handleResize: null };
     };
-  }, [config, updateVisibleRange, isChartValid]);
+  }, [config, updateVisibleRange, isChartValid, isMobile]);
 
+  // Update chart data
   useEffect(() => {
     if (!series.current || !data.length) return;
 
@@ -235,37 +255,34 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
 
     series.current.setData(formattedData);
     
-    // Auto-scale to fit data but preserve visible range when possible
     if (isChartValid() && formattedData.length > 0) {
       const timeScale = chart.current!.timeScale();
-      
-      // Only fit content if we have new data or timeframe changed significantly
       timeScale.fitContent();
       
-      // Force update of visible range after data change
       setTimeout(() => {
         updateVisibleRange();
-        // Force re-render of drawing tools by updating chart dimensions
-        const chartElement = chart.current!.chartElement();
-        setChartDimensions({
-          width: chartElement.clientWidth,
-          height: chartElement.clientHeight
-        });
+        if (chartContainerRef.current) {
+          setChartDimensions({
+            width: chartContainerRef.current.clientWidth,
+            height: chartContainerRef.current.clientHeight
+          });
+        }
       }, 100);
     }
   }, [data, timeframe, updateVisibleRange, isChartValid]);
 
+  // Handle timeframe changes
   useEffect(() => {
-  if (!isChartValid() || !data.length) return;
-  
-  // When timeframe changes, ensure drawings are re-rendered
-  const timer = setTimeout(() => {
+    if (!isChartValid() || !data.length) return;
+    
+    const timer = setTimeout(() => {
       updateVisibleRange();
-      const chartElement = chart.current!.chartElement();
-      setChartDimensions({
-        width: chartElement.clientWidth,
-        height: chartElement.clientHeight
-      });
+      if (chartContainerRef.current) {
+        setChartDimensions({
+          width: chartContainerRef.current.clientWidth,
+          height: chartContainerRef.current.clientHeight
+        });
+      }
     }, 300);
     
     return () => clearTimeout(timer);
@@ -279,23 +296,19 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
   };
 
   return (
-    <div className="chart-container" style={{ position: 'relative', width: '100%', height: '500px' }}>
+    <div className="chart-container" onClick={handleChartClick}>
       <ErrorBoundary>
         <div 
           ref={chartContainerRef} 
-          style={{ width: '100%', height: '100%', position: 'relative' }} 
-          onClick={handleChartClick}
+          style={{ 
+            width: '100%', 
+            height: '100%', 
+            position: 'relative',
+            minHeight: isMobile ? '300px' : '400px'
+          }} 
         />
         {isChartReady && isChartValid() && (
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            pointerEvents: 'none',
-            zIndex: 10
-          }}>
+          <div className={`drawing-layer ${activeTool ? 'interactive' : ''}`}>
             <DrawingTools 
               activeTool={activeTool}
               onToolSelect={setActiveTool}
@@ -307,6 +320,7 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
               isChartReady={isChartReady}
               chartDimensions={chartDimensions}
               visibleRange={visibleRange}
+              isMobile={isMobile}
             />
           </div>
         )}
