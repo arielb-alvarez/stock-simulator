@@ -576,7 +576,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           color: theme === 'dark' ? '#fff' : '#000',
           padding: isMobile ? '4px 6px' : '4px 3px',
           borderRadius: '4px',
-          boxShadow: '0 1px 5px rgba(0,0,0,0.1)',
+          boxShadow: '0 1px 5px rgba(0, 0, 0, 0.5)',
           display: 'flex',
           flexDirection: isMobile ? 'row' : 'column',
           alignItems: 'center',
