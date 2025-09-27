@@ -326,3 +326,7 @@ header {
     touch-action: pan-x pan-y;
   }
 }
+
+#tv-attr-logo {
+    display: none !important;
+}
