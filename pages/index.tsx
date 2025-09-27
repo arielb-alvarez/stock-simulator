@@ -53,7 +53,7 @@ const Home: React.FC = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      {/* Combined Header and Toolbar */}
+      {/* Compact Header */}
       <header className="main-header">
         <div className="header-left">
           <h1 className="chart-title">BTC/USDT</h1>
@@ -81,8 +81,9 @@ const Home: React.FC = () => {
           <button 
             className="clear-btn"
             onClick={handleClearDrawings}
+            title="Clear Drawings"
           >
-            Clear Drawings
+            Clear
           </button>
           
           <div className="theme-selector">
@@ -104,7 +105,8 @@ const Home: React.FC = () => {
         </div>
       </header>
 
-      <main className="chart-wrapper">
+      {/* Chart Area - Takes remaining space */}
+      <main className="chart-main">
         <Chart 
           key={`${config.theme}-${timeframe}`}
           data={candleData} 
@@ -116,61 +118,77 @@ const Home: React.FC = () => {
       </main>
 
       <style jsx>{`
+        .container {
+          display: flex;
+          flex-direction: column;
+          height: 100vh;
+          overflow: hidden;
+          padding: 8px;
+        }
+
+        .container.dark {
+          background-color: #131722;
+          color: #D9D9D9;
+        }
+
+        .container.light {
+          background-color: #FFFFFF;
+          color: #191919;
+        }
+
         .main-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 20px;
-          padding: 12px 0;
+          padding: 6px 0;
+          margin-bottom: 8px;
           border-bottom: 1px solid ${config.theme === 'dark' ? '#334158' : '#E5E7EB'};
-          flex-wrap: wrap;
-          gap: 15px;
+          flex-shrink: 0;
+          min-height: 40px;
         }
 
         .header-left {
           display: flex;
           align-items: center;
-          gap: 15px;
+          gap: 8px;
           flex: 1;
-          min-width: 200px;
         }
 
         .header-center {
           display: flex;
           justify-content: center;
-          flex: 1;
-          min-width: 300px;
+          flex: 2;
         }
 
         .header-right {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 6px;
           flex: 1;
           justify-content: flex-end;
-          min-width: 200px;
         }
 
         .chart-title {
-          font-size: 1.5rem;
+          font-size: 1rem;
           font-weight: 600;
           margin: 0;
-          color: ${config.theme === 'dark' ? '#FFFFFF' : '#1F2937'};
+          white-space: nowrap;
         }
 
         .connection-status {
           display: flex;
           align-items: center;
-          gap: 6px;
-          font-size: 0.875rem;
-          padding: 4px 8px;
-          border-radius: 4px;
+          gap: 4px;
+          font-size: 0.7rem;
+          padding: 2px 6px;
+          border-radius: 3px;
           background: ${config.theme === 'dark' ? '#1E222D' : '#F3F4F6'};
+          white-space: nowrap;
         }
 
         .status-dot {
-          width: 8px;
-          height: 8px;
+          width: 6px;
+          height: 6px;
           border-radius: 50%;
         }
 
@@ -184,22 +202,25 @@ const Home: React.FC = () => {
 
         .timeframe-selector {
           display: flex;
-          gap: 4px;
+          gap: 1px;
           background: ${config.theme === 'dark' ? '#1E222D' : '#F3F4F6'};
-          padding: 4px;
-          border-radius: 6px;
+          padding: 2px;
+          border-radius: 4px;
+          flex-wrap: wrap;
+          justify-content: center;
         }
 
         .timeframe-btn {
-          padding: 6px 12px;
+          padding: 3px 6px;
           border: none;
           background: transparent;
-          border-radius: 4px;
-          font-size: 0.875rem;
+          border-radius: 2px;
+          font-size: 0.7rem;
           font-weight: 500;
           cursor: pointer;
           color: ${config.theme === 'dark' ? '#9CA3AF' : '#6B7280'};
           transition: all 0.2s ease;
+          white-space: nowrap;
         }
 
         .timeframe-btn:hover {
@@ -213,15 +234,16 @@ const Home: React.FC = () => {
         }
 
         .clear-btn {
-          padding: 6px 12px;
+          padding: 3px 8px;
           border: none;
           background: ${config.theme === 'dark' ? '#EF4444' : '#DC2626'};
           color: white;
-          border-radius: 4px;
-          font-size: 0.875rem;
+          border-radius: 3px;
+          font-size: 0.7rem;
           font-weight: 500;
           cursor: pointer;
           transition: opacity 0.2s ease;
+          white-space: nowrap;
         }
 
         .clear-btn:hover {
@@ -230,19 +252,19 @@ const Home: React.FC = () => {
 
         .theme-selector {
           display: flex;
-          gap: 4px;
+          gap: 1px;
           background: ${config.theme === 'dark' ? '#1E222D' : '#F3F4F6'};
-          padding: 4px;
-          border-radius: 6px;
+          padding: 2px;
+          border-radius: 4px;
         }
 
         .theme-btn {
-          padding: 6px 10px;
+          padding: 3px 6px;
           border: none;
           background: transparent;
-          border-radius: 4px;
+          border-radius: 2px;
           cursor: pointer;
-          font-size: 0.875rem;
+          font-size: 0.7rem;
           transition: all 0.2s ease;
         }
 
@@ -254,18 +276,32 @@ const Home: React.FC = () => {
           background: ${config.theme === 'dark' ? '#334158' : '#D1D5DB'};
         }
 
+        .chart-main {
+          flex: 1;
+          display: flex;
+          min-height: 0; /* Important for flex children */
+          position: relative;
+        }
+
+        /* Mobile Styles */
         @media (max-width: 768px) {
+          .container {
+            padding: 6px;
+          }
+
           .main-header {
             flex-direction: column;
-            gap: 10px;
+            gap: 6px;
+            padding: 4px 0;
+            margin-bottom: 6px;
+            min-height: auto;
           }
 
           .header-left,
           .header-center,
           .header-right {
-            justify-content: center;
-            min-width: auto;
             width: 100%;
+            justify-content: center;
           }
 
           .header-left {
@@ -278,15 +314,41 @@ const Home: React.FC = () => {
 
           .header-right {
             order: 2;
+            gap: 8px;
           }
 
           .chart-title {
-            font-size: 1.25rem;
+            font-size: 0.9rem;
           }
 
           .timeframe-selector {
+            max-width: 100%;
+            overflow-x: auto;
+          }
+
+          .timeframe-btn {
+            padding: 4px 8px;
+            font-size: 0.65rem;
+          }
+        }
+
+        /* Very small screens */
+        @media (max-width: 480px) {
+          .container {
+            padding: 4px;
+          }
+
+          .main-header {
+            gap: 4px;
+          }
+
+          .header-right {
             flex-wrap: wrap;
             justify-content: center;
+          }
+
+          .theme-selector {
+            order: -1;
           }
         }
       `}</style>

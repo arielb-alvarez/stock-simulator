@@ -479,36 +479,38 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
         ref={colorPickerRef}
         style={{
           position: 'absolute',
-          top: '0',
-          left: '50px', // Position to the right of the color button
+          top: isMobile ? 'auto' : '0',
+          bottom: isMobile ? '100%' : 'auto',
+          left: isMobile ? '50%' : '50px',
+          transform: isMobile ? 'translateX(-50%)' : 'none',
           background: theme === 'dark' ? '#2a2e39' : '#ffffff',
           border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
           borderRadius: '8px',
-          padding: '10px',
+          padding: '8px',
           zIndex: 1000,
           boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-          minWidth: '200px'
+          minWidth: isMobile ? '250px' : '200px'
         }}
       >
-        <div style={{ marginBottom: '10px', fontSize: '12px', fontWeight: 'bold' }}>
+        <div style={{ marginBottom: '8px', fontSize: '11px', fontWeight: 'bold' }}>
           Select Color
         </div>
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: 'repeat(5, 1fr)', 
-          gap: '5px',
-          marginBottom: '10px'
+          gap: '4px',
+          marginBottom: '8px'
         }}>
           {COLOR_PALETTE.map((color) => (
             <button
               key={color}
               onClick={() => handleColorSelect(color)}
               style={{
-                width: '24px',
-                height: '24px',
+                width: '20px',
+                height: '20px',
                 backgroundColor: color,
                 border: `2px solid ${selectedColor === color ? (theme === 'dark' ? '#fff' : '#000') : 'transparent'}`,
-                borderRadius: '4px',
+                borderRadius: '3px',
                 cursor: 'pointer'
               }}
               title={color}
@@ -516,7 +518,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           ))}
         </div>
         
-        <div style={{ marginBottom: '10px', fontSize: '12px', fontWeight: 'bold' }}>
+        <div style={{ marginBottom: '8px', fontSize: '11px', fontWeight: 'bold' }}>
           Line Width: {lineWidth}px
         </div>
         <input
@@ -525,21 +527,20 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           max="10"
           value={lineWidth}
           onChange={(e) => handleLineWidthChange(parseInt(e.target.value))}
-          style={{ width: '100%' }}
+          style={{ width: '100%', marginBottom: '8px' }}
         />
         
         <div style={{ 
           display: 'flex', 
           alignItems: 'center', 
-          marginTop: '10px',
-          padding: '5px',
+          padding: '4px',
           border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
           borderRadius: '4px',
           background: selectedColor
         }}>
           <span style={{ 
             color: parseInt(selectedColor.replace('#', ''), 16) > 0x7FFFFF ? '#000' : '#fff',
-            fontSize: '11px',
+            fontSize: '10px',
             fontWeight: 'bold',
             flex: 1,
             textAlign: 'center'
@@ -553,24 +554,29 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
 
   return (
     <div className="drawing-tools">
+      {/* Tools Container - Positioned differently for mobile/desktop */}
       <div 
-        className="tools-vertical"
+        className="tools-container"
         style={{ 
           position: 'absolute',
-          top: '10px',
-          left: '10px', // Changed from right to left
+          top: isMobile ? 'auto' : '8px',
+          bottom: isMobile ? '8px' : 'auto',
+          left: isMobile ? '50%' : '8px',
+          transform: isMobile ? 'translateX(-50%)' : 'none',
           zIndex: 100,
           background: theme === 'dark' ? 'rgba(42, 46, 57, 0.95)' : 'rgba(255, 255, 255, 0.95)',
           color: theme === 'dark' ? '#fff' : '#000',
-          padding: '8px 5px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+          padding: isMobile ? '4px 6px' : '4px 3px',
+          borderRadius: '4px',
+          boxShadow: '0 1px 5px rgba(0,0,0,0.1)',
           display: 'flex',
-          flexDirection: 'column',
+          flexDirection: isMobile ? 'row' : 'column',
           alignItems: 'center',
-          gap: '8px',
+          gap: isMobile ? '6px' : '4px',
           pointerEvents: 'auto',
           backdropFilter: 'blur(10px)',
+          maxWidth: isMobile ? 'calc(100vw - 16px)' : 'auto',
+          overflowX: isMobile ? 'auto' : 'visible'
         }}
       >
         {/* Line Tool */}
@@ -578,8 +584,22 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           className={`tool-button ${activeTool === 'line' ? 'active' : ''}`}
           onClick={() => onToolSelect(activeTool === 'line' ? null : 'line')}
           title="Line Tool"
+          style={{
+            width: '24px',
+            height: '24px',
+            padding: '3px',
+            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+            background: activeTool === 'line' ? (theme === 'dark' ? '#3B82F6' : '#2563EB') : 'transparent',
+            color: theme === 'dark' ? '#fff' : '#000',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease'
+          }}
         >
-          <LineIcon color={activeTool === 'line' ? (theme === 'dark' ? '#fff' : '#000') : (theme === 'dark' ? '#ccc' : '#666')} />
+          <LineIcon size={16} color={activeTool === 'line' ? '#fff' : (theme === 'dark' ? '#ccc' : '#666')} />
         </button>
         
         {/* Rectangle Tool */}
@@ -587,8 +607,22 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           className={`tool-button ${activeTool === 'rectangle' ? 'active' : ''}`}
           onClick={() => onToolSelect(activeTool === 'rectangle' ? null : 'rectangle')}
           title="Rectangle Tool"
+          style={{
+            width: '24px',
+            height: '24px',
+            padding: '3px',
+            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+            background: activeTool === 'rectangle' ? (theme === 'dark' ? '#3B82F6' : '#2563EB') : 'transparent',
+            color: theme === 'dark' ? '#fff' : '#000',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease'
+          }}
         >
-          <RectangleIcon color={activeTool === 'rectangle' ? (theme === 'dark' ? '#fff' : '#000') : (theme === 'dark' ? '#ccc' : '#666')} />
+          <RectangleIcon size={16} color={activeTool === 'rectangle' ? '#fff' : (theme === 'dark' ? '#ccc' : '#666')} />
         </button>
         
         {/* Circle Tool */}
@@ -596,8 +630,22 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           className={`tool-button ${activeTool === 'circle' ? 'active' : ''}`}
           onClick={() => onToolSelect(activeTool === 'circle' ? null : 'circle')}
           title="Circle Tool"
+          style={{
+            width: '24px',
+            height: '24px',
+            padding: '3px',
+            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+            background: activeTool === 'circle' ? (theme === 'dark' ? '#3B82F6' : '#2563EB') : 'transparent',
+            color: theme === 'dark' ? '#fff' : '#000',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease'
+          }}
         >
-          <CircleIcon color={activeTool === 'circle' ? (theme === 'dark' ? '#fff' : '#000') : (theme === 'dark' ? '#ccc' : '#666')} />
+          <CircleIcon size={16} color={activeTool === 'circle' ? '#fff' : (theme === 'dark' ? '#ccc' : '#666')} />
         </button>
         
         {/* Freehand Tool */}
@@ -605,8 +653,22 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           className={`tool-button ${activeTool === 'freehand' ? 'active' : ''}`}
           onClick={() => onToolSelect(activeTool === 'freehand' ? null : 'freehand')}
           title="Freehand Tool"
+          style={{
+            width: '24px',
+            height: '24px',
+            padding: '3px',
+            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+            background: activeTool === 'freehand' ? (theme === 'dark' ? '#3B82F6' : '#2563EB') : 'transparent',
+            color: theme === 'dark' ? '#fff' : '#000',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease'
+          }}
         >
-          <PenIcon color={activeTool === 'freehand' ? (theme === 'dark' ? '#fff' : '#000') : (theme === 'dark' ? '#ccc' : '#666')} />
+          <PenIcon size={16} color={activeTool === 'freehand' ? '#fff' : (theme === 'dark' ? '#ccc' : '#666')} />
         </button>
         
         {/* Eraser Tool */}
@@ -614,39 +676,68 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           className={`tool-button ${activeTool === 'eraser' ? 'active' : ''}`}
           onClick={() => onToolSelect(activeTool === 'eraser' ? null : 'eraser')}
           title="Eraser Tool"
+          style={{
+            width: '24px',
+            height: '24px',
+            padding: '3px',
+            border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+            background: activeTool === 'eraser' ? (theme === 'dark' ? '#3B82F6' : '#2563EB') : 'transparent',
+            color: theme === 'dark' ? '#fff' : '#000',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease'
+          }}
         >
-          <EraserIcon color={activeTool === 'eraser' ? (theme === 'dark' ? '#fff' : '#000') : (theme === 'dark' ? '#ccc' : '#666')} />
+          <EraserIcon size={16} color={activeTool === 'eraser' ? '#fff' : (theme === 'dark' ? '#ccc' : '#666')} />
         </button>
         
+        {/* Separator */}
         <div style={{ 
-          width: '100%', 
-          height: '1px', 
+          width: isMobile ? '1px' : '100%', 
+          height: isMobile ? '100%' : '1px', 
           backgroundColor: theme === 'dark' ? '#444' : '#ccc',
-          margin: '4px 0'
+          margin: isMobile ? '0 4px' : '4px 0'
         }} />
         
-        {/* Color Picker - This doesn't set an active tool */}
+        {/* Color Picker */}
         <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
           <button 
             className={`tool-button ${showColorPicker ? 'active' : ''}`}
             onClick={() => setShowColorPicker(!showColorPicker)}
             title="Color Picker"
+            style={{
+              width: '24px',
+              height: '24px',
+              padding: '3px',
+              border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+              background: showColorPicker ? (theme === 'dark' ? '#3B82F6' : '#2563EB') : 'transparent',
+              color: theme === 'dark' ? '#fff' : '#000',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
+            }}
           >
-            <ColorPaletteIcon color={showColorPicker ? (theme === 'dark' ? '#fff' : '#000') : (theme === 'dark' ? '#ccc' : '#666')} />
+            <ColorPaletteIcon size={16} color={showColorPicker ? '#fff' : (theme === 'dark' ? '#ccc' : '#666')} />
           </button>
-          {showColorPicker && renderColorPicker()}
+          {renderColorPicker()}
         </div>
         
+        {/* Line Width Display */}
         <div style={{ 
           display: 'flex', 
-          flexDirection: 'column',
+          flexDirection: isMobile ? 'row' : 'column',
           alignItems: 'center',
-          fontSize: '10px',
+          fontSize: '9px',
           color: theme === 'dark' ? '#ccc' : '#666',
-          marginTop: '4px'
+          gap: '2px'
         }}>
-          <span>Width</span>
-          <span>{lineWidth}px</span>
+          <span>W:{lineWidth}</span>
         </div>
       </div>
       

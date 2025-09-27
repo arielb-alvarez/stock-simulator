@@ -1,6 +1,8 @@
-/* globals.css - Responsive Version */
-body {
+html, body {
   margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden; /* Prevent body scroll */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
@@ -12,183 +14,13 @@ body {
   box-sizing: border-box;
 }
 
-/* Responsive Chart Container */
+/* Chart Container - Full height within flex parent */
 .chart-container {
   position: relative;
   width: 100%;
-  height: 500px; /* Default height for desktop */
-  margin-left: 0; /* Remove fixed margin */
-}
-
-/* Mobile First Approach */
-@media (max-width: 768px) {
-  .chart-container {
-    height: 400px; /* Smaller height for mobile */
-    margin-left: 0;
-  }
-}
-
-@media (min-width: 1200px) {
-  .chart-container {
-    height: 600px; /* Larger height for big screens */
-  }
-}
-
-/* Header Responsive Styles */
-header {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 20px;
-  padding: 0 10px;
-}
-
-@media (min-width: 768px) {
-  header {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0;
-  }
-}
-
-.connection-status {
-  padding: 8px 12px;
-  border-radius: 4px;
-  font-weight: bold;
-  font-size: 14px;
-  color: white;
-  text-align: center;
-}
-
-@media (max-width: 768px) {
-  .connection-status {
-    font-size: 12px;
-    padding: 6px 10px;
-  }
-}
-
-/* Drawing Tools Responsive */
-.drawing-tools {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
   height: 100%;
-  z-index: 10;
-}
-
-/* Toolbar - Responsive positioning */
-.tools-vertical {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 100;
-  background: rgba(42, 46, 57, 0.9);
-  padding: 8px 5px;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  pointer-events: auto;
-  backdrop-filter: blur(10px);
-}
-
-/* Mobile toolbar - horizontal at bottom */
-@media (max-width: 768px) {
-  .tools-vertical {
-    top: auto;
-    bottom: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    flex-direction: row;
-    padding: 5px 8px;
-    background: rgba(42, 46, 57, 0.95);
-  }
-}
-
-.tool-button {
-  width: 36px;
-  height: 36px;
-  padding: 6px;
-  border: 1px solid #444;
-  background: transparent;
-  color: #fff;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.tool-button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  transform: translateY(-1px);
-}
-
-.tool-button.active {
-  background: #2962FF;
-  border-color: #2962FF;
-}
-
-/* Color Picker Responsive */
-.color-picker-popup {
-  position: absolute;
-  top: 0;
-  left: 50px;
-  background: #2a2e39;
-  border: 1px solid #444;
-  border-radius: 8px;
-  padding: 10px;
-  z-index: 1000;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-  min-width: 200px;
-}
-
-@media (max-width: 768px) {
-  .color-picker-popup {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    min-width: 280px;
-    max-width: 90vw;
-  }
-}
-
-/* Main Container Responsive */
-.container {
-  padding: 15px;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-@media (min-width: 768px) {
-  .container {
-    padding: 20px;
-  }
-}
-
-.container.dark {
-  background-color: #131722;
-  color: #D9D9D9;
-}
-
-.container.light {
-  background-color: #FFFFFF;
-  color: #191919;
-}
-
-/* Chart wrapper for proper spacing */
-.chart-wrapper {
+  min-height: 300px;
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  margin-left: 0; /* Remove fixed margin */
 }
 
 /* Ensure chart elements are responsive */
@@ -213,172 +45,10 @@ header {
   pointer-events: auto;
 }
 
-/* Toolbar component responsive */
-.main-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding: 12px 0;
-  flex-wrap: wrap;
-  gap: 15px;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  flex: 1;
-  min-width: 200px;
-}
-
-.header-center {
-  display: flex;
-  justify-content: center;
-  flex: 1;
-  min-width: 300px;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  justify-content: flex-end;
-  min-width: 200px;
-}
-
-.chart-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0;
-}
-
-.connection-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.875rem;
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-/* Mobile responsiveness */
-@media (max-width: 768px) {
-  .main-header {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .header-left,
-  .header-center,
-  .header-right {
-    justify-content: center;
-    min-width: auto;
-    width: 100%;
-  }
-
-  .header-left {
-    order: 1;
-  }
-
-  .header-center {
-    order: 3;
-  }
-
-  .header-right {
-    order: 2;
-  }
-
-  .chart-title {
-    font-size: 1.25rem;
-  }
-
-  .timeframe-selector {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-}
-
-/* Button responsive styles */
-.btn-responsive {
-  padding: 8px 16px;
-  font-size: 14px;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  background: #f8f8f8;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-@media (max-width: 768px) {
-  .btn-responsive {
-    padding: 6px 12px;
-    font-size: 12px;
-    flex: 1;
-    min-width: 0;
-  }
-}
-
-.btn-responsive:hover {
-  background: #e8e8e8;
-}
-
-/* Select element responsive */
-.select-responsive {
-  padding: 8px 12px;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  background: #f8f8f8;
-  font-size: 14px;
-  min-width: 120px;
-}
-
-@media (max-width: 768px) {
-  .select-responsive {
-    padding: 6px 10px;
-    font-size: 12px;
-    min-width: 100px;
-    flex: 1;
-  }
-}
-
-/* Error message responsive */
-.error-message {
-  padding: 15px;
-  background-color: #2a2d3e;
-  border-radius: 4px;
-  text-align: center;
-  margin: 15px 0;
-  font-size: 14px;
-}
-
-@media (max-width: 768px) {
-  .error-message {
-    padding: 10px;
-    margin: 10px 0;
-    font-size: 12px;
-  }
-}
-
-/* Ensure SVG drawings scale properly */
-.drawing-tools svg {
-  vector-effect: non-scaling-stroke;
-}
-
 /* Touch improvements for mobile */
 @media (max-width: 768px) {
-  .tool-button {
-    width: 44px;
-    height: 44px;
-    padding: 8px;
+  .chart-container {
+    min-height: 250px;
   }
   
   /* Improve touch targets */
@@ -394,4 +64,26 @@ header {
 
 #tv-attr-logo {
     display: none !important;
+}
+
+/* Tool button hover effects */
+.tool-button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  transform: translateY(-1px);
+}
+
+.tool-button.active {
+  background: #2962FF !important;
+  border-color: #2962FF !important;
+}
+
+/* Remove any default margins and padding that might cause scrollbars */
+body > div#__next {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Ensure no element causes horizontal scroll */
+div {
+  max-width: 100%;
 }
