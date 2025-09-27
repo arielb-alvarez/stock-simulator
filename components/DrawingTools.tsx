@@ -20,8 +20,17 @@ interface DrawingToolsProps {
 const COLOR_PALETTE = [
   '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF',
   '#00FFFF', '#FFA500', '#800080', '#008000', '#000080',
-  '#FFFFFF', '#000000', '#FFC0CB', '#A52A2A', '#808080',
+  '#CCCCCC', '#000000', '#FFC0CB', '#A52A2A', '#808080',
 ];
+
+const getContrastColor = (hexColor: string): string => {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? '#000000' : '#FFFFFF';
+};
 
 // Icon components
 const LineIcon = ({ color = 'currentColor', size = 20 }) => (
@@ -78,7 +87,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
   const [currentDrawing, setCurrentDrawing] = useState<Drawing | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [chartReady, setChartReady] = useState(false);
-  const [selectedColor, setSelectedColor] = useState(theme === 'dark' ? '#FFFFFF' : '#000000');
+  const [selectedColor, setSelectedColor] = useState(theme === 'dark' ? '#CCCCCC' : '#000000');
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [lineWidth, setLineWidth] = useState(2);
   const drawingLayerRef = useRef<HTMLDivElement>(null);
@@ -707,23 +716,26 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({
           <button 
             className={`tool-button ${showColorPicker ? 'active' : ''}`}
             onClick={() => setShowColorPicker(!showColorPicker)}
-            title="Color Picker"
+            title={`Current Color: ${selectedColor}`}
             style={{
               width: '24px',
               height: '24px',
-              padding: '3px',
-              border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
-              background: showColorPicker ? (theme === 'dark' ? '#3B82F6' : '#2563EB') : 'transparent',
-              color: theme === 'dark' ? '#fff' : '#000',
+              border: `2px solid ${showColorPicker ? (theme === 'dark' ? '#3B82F6' : '#2563EB') : 'transparent'}`,
+              background: selectedColor,
               borderRadius: '4px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              boxShadow: `0 0 0 1px ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`
             }}
           >
-            <ColorPaletteIcon size={16} color={showColorPicker ? '#fff' : (theme === 'dark' ? '#ccc' : '#666')} />
+            {showColorPicker && (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={getContrastColor(selectedColor)} strokeWidth="3">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            )}
           </button>
           {renderColorPicker()}
         </div>

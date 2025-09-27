@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChartConfig } from '../types';
 
 interface ToolbarProps {
@@ -16,6 +16,23 @@ const Toolbar: React.FC<ToolbarProps> = ({
   timeframe,
   onClearDrawings
 }) => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    // Initial check
+    checkScreenSize();
+
+    // Add event listener
+    window.addEventListener('resize', checkScreenSize);
+
+    // Cleanup
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
   const updateConfig = (updates: Partial<ChartConfig>) => {
     onConfigChange({ ...config, ...updates });
   };
@@ -29,20 +46,84 @@ const Toolbar: React.FC<ToolbarProps> = ({
     { value: '1d', label: '1d' }
   ];
 
+  const themes = [
+    { value: 'light', label: 'Light', icon: '☀️' },
+    { value: 'dark', label: 'Dark', icon: '🌙' }
+  ];
+
+  const renderTimeframeSelector = () => {
+    if (isMobile) {
+      return (
+        <select
+          className="timeframe-dropdown"
+          value={timeframe}
+          onChange={(e) => onTimeframeChange(e.target.value)}
+        >
+          {timeframes.map((tf) => (
+            <option key={tf.value} value={tf.value}>
+              {tf.label}
+            </option>
+          ))}
+        </select>
+      );
+    }
+
+    return (
+      <div className="timeframe-selector">
+        {timeframes.map((tf) => (
+          <button
+            key={tf.value}
+            className={`timeframe-btn ${timeframe === tf.value ? 'active' : ''}`}
+            onClick={() => onTimeframeChange(tf.value)}
+          >
+            {tf.label}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const renderThemeSelector = () => {
+    if (isMobile) {
+      return (
+        <select
+          className="theme-dropdown"
+          value={config.theme}
+          onChange={(e) => updateConfig({ theme: e.target.value as 'light' | 'dark' })}
+        >
+          {themes.map((theme) => (
+            <option key={theme.value} value={theme.value}>
+              {theme.label}
+            </option>
+          ))}
+        </select>
+      );
+    }
+
+    return (
+      <div className="theme-selector">
+        <button
+          className={`theme-btn ${config.theme === 'light' ? 'active' : ''}`}
+          onClick={() => updateConfig({ theme: 'light' })}
+          title="Light theme"
+        >
+          ☀️
+        </button>
+        <button
+          className={`theme-btn ${config.theme === 'dark' ? 'active' : ''}`}
+          onClick={() => updateConfig({ theme: 'dark' })}
+          title="Dark theme"
+        >
+          🌙
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div className="toolbar">
       <div className="toolbar-left">
-        <div className="timeframe-selector">
-          {timeframes.map((tf) => (
-            <button
-              key={tf.value}
-              className={`timeframe-btn ${timeframe === tf.value ? 'active' : ''}`}
-              onClick={() => onTimeframeChange(tf.value)}
-            >
-              {tf.label}
-            </button>
-          ))}
-        </div>
+        {renderTimeframeSelector()}
       </div>
 
       <div className="toolbar-right">
@@ -55,22 +136,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </button>
         )}
         
-        <div className="theme-selector">
-          <button
-            className={`theme-btn ${config.theme === 'light' ? 'active' : ''}`}
-            onClick={() => updateConfig({ theme: 'light' })}
-            title="Light theme"
-          >
-            ☀️
-          </button>
-          <button
-            className={`theme-btn ${config.theme === 'dark' ? 'active' : ''}`}
-            onClick={() => updateConfig({ theme: 'dark' })}
-            title="Dark theme"
-          >
-            🌙
-          </button>
-        </div>
+        {renderThemeSelector()}
       </div>
 
       <style jsx>{`
@@ -160,6 +226,42 @@ const Toolbar: React.FC<ToolbarProps> = ({
         
         .clear-btn:hover {
           opacity: 0.9;
+        }
+        
+        /* Dropdown styles for mobile */
+        .timeframe-dropdown,
+        .theme-dropdown {
+          padding: 8px 12px;
+          border: none;
+          border-radius: 6px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          background: ${config.theme === 'dark' ? '#1E222D' : '#F3F4F6'};
+          color: ${config.theme === 'dark' ? '#FFFFFF' : '#374151'};
+          min-width: 80px;
+        }
+        
+        .theme-dropdown {
+          min-width: 100px;
+        }
+        
+        /* Mobile-specific adjustments */
+        @media (max-width: 768px) {
+          .toolbar {
+            padding: 6px 0;
+            margin-bottom: 12px;
+          }
+          
+          .toolbar-left,
+          .toolbar-right {
+            gap: 8px;
+          }
+          
+          .clear-btn {
+            padding: 6px 10px;
+            font-size: 12px;
+          }
         }
       `}</style>
     </div>

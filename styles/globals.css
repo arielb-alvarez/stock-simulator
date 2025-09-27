@@ -45,13 +45,13 @@ html, body {
   pointer-events: auto;
 }
 
-/* Touch improvements for mobile */
+/* Improved mobile responsiveness */
 @media (max-width: 768px) {
   .chart-container {
     min-height: 250px;
   }
   
-  /* Improve touch targets */
+  /* Improve touch targets for mobile */
   .chart-container {
     -webkit-tap-highlight-color: transparent;
   }
@@ -59,6 +59,35 @@ html, body {
   /* Prevent zoom on double-tap */
   .drawing-tools {
     touch-action: pan-x pan-y;
+  }
+  
+  /* Better dropdown appearance on mobile */
+  select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
+    padding-right: 30px;
+  }
+  
+  .timeframe-dropdown {
+    background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'><path fill='%23666' d='M2 0L0 2h4zm0 5L0 3h4z'/></svg>");
+  }
+  
+  .theme-dropdown {
+    background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'><path fill='%23666' d='M2 0L0 2h4zm0 5L0 3h4z'/></svg>");
+  }
+  
+  /* Dark theme dropdown styles */
+  .toolbar select {
+    border: 1px solid transparent;
+  }
+  
+  .toolbar select:focus {
+    outline: none;
+    border-color: #3B82F6;
   }
 }
 
@@ -86,4 +115,24 @@ body > div#__next {
 /* Ensure no element causes horizontal scroll */
 div {
   max-width: 100%;
+}
+
+/* Improve select dropdown styling for both themes */
+select {
+  font-family: inherit;
+  border: none;
+  outline: none;
+}
+
+select option {
+  background: white;
+  color: #374151;
+}
+
+/* Dark theme select options */
+@media (prefers-color-scheme: dark) {
+  select option {
+    background: #1E222D;
+    color: #FFFFFF;
+  }
 }
