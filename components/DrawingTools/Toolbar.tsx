@@ -82,7 +82,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   );
 };
 
-// Compact ToolButton
 const ToolButton: React.FC<{
   active: boolean;
   icon: React.ComponentType<{ color?: string; size?: number }>;
@@ -110,13 +109,16 @@ const ToolButton: React.FC<{
       alignItems: 'center',
       justifyContent: 'center',
       transition: 'all 0.15s ease',
-      transform: active ? 'scale(0.95)' : 'scale(1)'
+      transform: active ? 'scale(0.95)' : 'scale(1)',
+      // Add opacity to make inactive state more obvious
+      opacity: active ? 1 : 0.7
     }}
     onMouseEnter={(e) => {
       if (!active) {
         e.currentTarget.style.background = theme === 'dark' 
           ? 'rgba(255,255,255,0.1)' 
           : 'rgba(0,0,0,0.08)';
+        e.currentTarget.style.opacity = '1';
       }
     }}
     onMouseLeave={(e) => {
@@ -124,6 +126,7 @@ const ToolButton: React.FC<{
         e.currentTarget.style.background = theme === 'dark' 
           ? 'rgba(255,255,255,0.05)' 
           : 'rgba(0,0,0,0.05)';
+        e.currentTarget.style.opacity = '0.7';
       }
     }}
   >

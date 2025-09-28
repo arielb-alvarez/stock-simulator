@@ -33,7 +33,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
       style={{
         position: 'absolute',
         top: isMobile ? 'auto' : '60px',
-        bottom: isMobile ? '10px' : 'auto',
+        bottom: isMobile ? '40px' : 'auto',
         left: isMobile ? '50%' : '45px',
         transform: isMobile ? 'translateX(-50%)' : 'none',
         zIndex: 21,
