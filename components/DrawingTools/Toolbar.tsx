@@ -34,17 +34,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
     <div 
       style={{ 
         background: theme === 'dark' ? 'rgba(42, 46, 57, 0.98)' : 'rgba(255, 255, 255, 0.98)',
-        padding: isMobile ? '6px 8px' : '6px 4px',
-        borderRadius: '8px',
-        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.25)',
+        padding: '6px 4px',
         display: 'flex',
-        flexDirection: isMobile ? 'row' : 'column',
+        flexDirection: 'column', // Always column layout
         alignItems: 'center',
-        gap: isMobile ? '6px' : '4px',
+        gap: '4px',
         backdropFilter: 'blur(10px)',
-        border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
-        maxWidth: isMobile ? 'calc(100vw - 20px)' : 'none',
+        borderRight: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
         overflow: 'visible',
+        height: '100%',
       }}
     >
       {tools.map(({ id, icon: Icon, title }) => (
@@ -59,12 +57,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
         />
       ))}
       
-      {/* Separator */}
+      {/* Separator - always horizontal */}
       <div style={{ 
-        width: isMobile ? '1px' : '100%', 
-        height: isMobile ? '24px' : '1px', 
+        width: '100%', 
+        height: '1px', 
         backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)',
-        margin: isMobile ? '0 4px' : '4px 0'
+        margin: '4px 0'
       }} />
       
       {/* Color Picker Button */}
@@ -94,23 +92,19 @@ const ToolButton: React.FC<{
     onClick={onClick}
     title={title}
     style={{
-      width: isMobile ? '32px' : '28px',
-      height: isMobile ? '32px' : '28px',
+      width: '32px', // Consistent size
+      height: '32px',
       padding: '3px',
-      border: `1px solid ${active 
-        ? (theme === 'dark' ? '#3B82F6' : '#2563EB') 
-        : (theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)')}`,
+      border: 0,
       background: active 
         ? (theme === 'dark' ? '#3B82F6' : '#2563EB') 
         : (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
-      borderRadius: '5px',
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       transition: 'all 0.15s ease',
       transform: active ? 'scale(0.95)' : 'scale(1)',
-      // Add opacity to make inactive state more obvious
       opacity: active ? 1 : 0.7
     }}
     onMouseEnter={(e) => {
@@ -131,7 +125,7 @@ const ToolButton: React.FC<{
     }}
   >
     <Icon 
-      size={isMobile ? 16 : 14} 
+      size={16} // Consistent icon size
       color={active 
         ? '#fff' 
         : (theme === 'dark' ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)')} 

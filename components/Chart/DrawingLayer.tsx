@@ -463,19 +463,18 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
         <>
             <div style={{
                 position: 'absolute',
-                top: isMobile ? 'auto' : '10px',
-                bottom: isMobile ? '40px' : 'auto',
-                left: isMobile ? '50%' : '10px',
-                transform: isMobile ? 'translateX(-50%)' : 'none',
+                top: '0',
+                left: '0',
                 zIndex: 20,
                 pointerEvents: 'auto',
+                height: '100%',
             }}>
                 <Toolbar
                     activeTool={activeTool}
                     onToolSelect={handleToolSelect}
                     selectedColor={selectedColor}
                     lineWidth={lineWidth}
-                    onColorPickerToggle={handleColorPickerToggle} // FIXED: Use dedicated toggle handler
+                    onColorPickerToggle={handleColorPickerToggle}
                     showColorPicker={showColorPicker}
                     theme={config.theme}
                     isMobile={isMobile}
@@ -485,10 +484,8 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
             {showColorPicker && (
                 <div style={{
                     position: 'absolute',
-                    top: isMobile ? 'auto' : '60px',
-                    bottom: isMobile ? '60px' : 'auto',
-                    left: isMobile ? '50%' : '10px',
-                    transform: isMobile ? 'translateX(-50%)' : 'none',
+                    top: '60px',
+                    left: '10px',
                     zIndex: 21,
                     pointerEvents: 'auto',
                 }}>
@@ -500,7 +497,7 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
                         theme={config.theme}
                         isMobile={isMobile}
                         show={showColorPicker}
-                        onClose={handleColorPickerClose} // FIXED: Use dedicated close handler
+                        onClose={handleColorPickerClose}
                     />
                 </div>
             )}

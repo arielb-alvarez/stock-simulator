@@ -141,8 +141,7 @@ select option {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 0;
-  margin-bottom: 8px;
+  padding: 6px;
   border-bottom: 1px solid;
   flex-shrink: 0;
   min-height: 40px;
@@ -337,8 +336,7 @@ select option {
   .main-header {
     flex-direction: column;
     gap: 6px;
-    padding: 4px 0;
-    margin-bottom: 6px;
+    padding: 4px;
     min-height: auto;
   }
 
@@ -398,5 +396,14 @@ select option {
 
   .theme-selector {
     order: -1;
+  }
+}
+
+/* Mobile adjustments for left-positioned toolbar */
+@media (max-width: 768px) {  
+  /* Improve touch targets for mobile left toolbar */
+  .tool-button {
+    min-width: 32px;
+    min-height: 32px;
   }
 }
