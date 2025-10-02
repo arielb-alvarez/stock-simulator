@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useRef, useEffect } from 'react';
 import { IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { Drawing } from '../../types';
 
@@ -23,30 +23,45 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
   activeTool,
   viewportVersion,
 }) => {
+  // Use refs to avoid triggering effects during render
+  const chartRef = useRef(chart);
+  const seriesRef = useRef(series);
+  
+  // Update refs when props change, but don't trigger re-renders
+  useEffect(() => {
+    chartRef.current = chart;
+  }, [chart]);
+  
+  useEffect(() => {
+    seriesRef.current = series;
+  }, [series]);
+
   const safeTimeToCoordinate = useCallback((time: number): number | null => {
-    if (!chart?.timeScale()) return null;
+    const currentChart = chartRef.current;
+    if (!currentChart?.timeScale()) return null;
     
     try {
       const chartTime = (time / 1000) as UTCTimestamp;
-      const coord = chart.timeScale().timeToCoordinate(chartTime);
+      const coord = currentChart.timeScale().timeToCoordinate(chartTime);
       return coord !== null && !isNaN(coord) && isFinite(coord) ? Math.round(coord) : null;
     } catch (error) {
       console.warn('Error converting time to coordinate:', error, time);
       return null;
     }
-  }, [chart]);
+  }, []); // Remove chart dependency since we use ref
 
   const priceToCoordinate = useCallback((price: number): number | null => {
-    if (!series) return null;
+    const currentSeries = seriesRef.current;
+    if (!currentSeries) return null;
     
     try {
-      const coord = series.priceToCoordinate(price);
+      const coord = currentSeries.priceToCoordinate(price);
       return coord !== null && !isNaN(coord) && isFinite(coord) ? Math.round(coord) : null;
     } catch (error) {
       console.warn('Error converting price to coordinate:', error, price);
       return null;
     }
-  }, [series]);
+  }, []); // Remove series dependency since we use ref
 
   // Filter out invalid drawings and convert to renderable format
   const renderableDrawings = useMemo(() => {
@@ -87,14 +102,16 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
         strokeWidth: drawing.width,
         fill: 'none' as const,
         vectorEffect: 'non-scaling-stroke' as const,
-        key: `${drawing.id}-${viewportVersion}`
       };
+
+      const drawingKey = `${drawing.id}-${viewportVersion}`;
 
       switch (drawing.type) {
         case 'freehand':
           if (coordinates.length < 2) return null;
           return (
             <polyline
+              key={drawingKey}
               {...commonProps}
               points={coordinates.map(coord => `${coord.x},${coord.y}`).join(' ')}
               fill="none"
@@ -105,6 +122,7 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
           if (coordinates.length !== 2) return null;
           return (
             <line
+              key={drawingKey}
               {...commonProps}
               x1={coordinates[0].x}
               y1={coordinates[0].y}
@@ -121,6 +139,7 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
           const rectHeight = Math.abs(coordinates[1].y - coordinates[0].y);
           return (
             <rect
+              key={drawingKey}
               {...commonProps}
               x={rectX}
               y={rectY}
@@ -140,6 +159,7 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
           );
           return (
             <circle
+              key={drawingKey}
               {...commonProps}
               cx={centerX}
               cy={centerY}
@@ -156,7 +176,7 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
       console.error('Error rendering drawing:', error, drawing);
       return null;
     }
-  }, [safeTimeToCoordinate, priceToCoordinate, viewportVersion, chartDimensions]);
+  }, [safeTimeToCoordinate, priceToCoordinate, viewportVersion]);
 
   // Render current drawing separately to ensure it's always visible
   const renderCurrentDrawing = useCallback(() => {
@@ -164,7 +184,7 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
     return renderDrawing(currentDrawing);
   }, [currentDrawing, renderDrawing]);
 
-  if (!chart || !series || chartDimensions.width === 0 || chartDimensions.height === 0) {
+  if (!chartRef.current || !seriesRef.current || chartDimensions.width === 0 || chartDimensions.height === 0) {
     return null;
   }
 

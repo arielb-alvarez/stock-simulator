@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { Drawing, ChartConfig } from '../../types';
 import Toolbar from './../DrawingTools/Toolbar';
@@ -41,6 +41,69 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [lineWidth, setLineWidth] = useState(2);
     const [viewportVersion, setViewportVersion] = useState(0);
+    
+    // Add refs to track states
+    const isDrawingRef = useRef(false);
+    const isEraserActiveRef = useRef(false);
+    const activeToolRef = useRef(activeTool);
+
+    // Sync refs with state
+    useEffect(() => {
+        isDrawingRef.current = isDrawing;
+        isEraserActiveRef.current = activeTool === 'eraser';
+        activeToolRef.current = activeTool;
+    }, [isDrawing, activeTool]);
+
+    // FIXED: Tool selection handler - only handle tool selection, not color picker
+    const handleToolSelect = useCallback((tool: string | null) => {
+        // Toggle off if the same tool is clicked again
+        if (activeTool === tool) {
+            setActiveTool(null);
+        } else {
+            setActiveTool(tool);
+        }
+        // Always close color picker when changing tools
+        setShowColorPicker(false);
+    }, [activeTool]);
+
+    // FIXED: Color picker toggle handler
+    const handleColorPickerToggle = useCallback(() => {
+        setShowColorPicker(prev => !prev);
+    }, []);
+
+    // FIXED: Color selection handler - don't change active tool
+    const handleColorSelect = useCallback((color: string) => {
+        setSelectedColor(color);
+        // Keep the color picker open after selection for potential further adjustments
+        // setShowColorPicker(false); // Removed this line to keep picker open
+    }, []);
+
+    const handleLineWidthChange = useCallback((width: number) => {
+        setLineWidth(width);
+    }, []);
+
+    // FIXED: Close color picker handler
+    const handleColorPickerClose = useCallback(() => {
+        setShowColorPicker(false);
+    }, []);
+
+    // NEW: Right-click handler to deactivate active tool
+    const handleRightClick = useCallback((e: React.MouseEvent) => {
+        // Only handle if there's an active tool or color picker is open
+        if (activeTool || showColorPicker) {
+            e.preventDefault(); // Prevent default context menu
+            e.stopPropagation();
+            
+            setActiveTool(null);
+            setShowColorPicker(false);
+            
+            // If we were in the middle of drawing, cancel it
+            if (isDrawing) {
+                setIsDrawing(false);
+                setCurrentDrawing(null);
+            }
+        }
+    }, [activeTool, showColorPicker, isDrawing]);
 
     useEffect(() => {
         if (!chart || !series) return;
@@ -131,7 +194,8 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
     }, [chart, series, chartContainerRef]);
 
     const handleDrawingStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-        if (!activeTool || activeTool === 'eraser') return;
+        // FIXED: Don't start drawing if color picker is open
+        if (!activeTool || activeTool === 'eraser' || showColorPicker) return;
         
         const pos = getEventPosition(e);
         if (!pos) return;
@@ -154,10 +218,10 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
         };
 
         setCurrentDrawing(newDrawing);
-    }, [activeTool, getEventPosition, selectedColor, lineWidth]);
+    }, [activeTool, getEventPosition, selectedColor, lineWidth, showColorPicker]);
 
     const handleDrawingMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-        if (!isDrawing || !currentDrawing) return;
+        if (!isDrawing || !currentDrawing || showColorPicker) return;
         
         const pos = getEventPosition(e);
         if (!pos) return;
@@ -185,7 +249,7 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
         }
 
         setCurrentDrawing(updatedDrawing);
-    }, [isDrawing, currentDrawing, getEventPosition]);
+    }, [isDrawing, currentDrawing, getEventPosition, showColorPicker]);
 
     const handleDrawingEnd = useCallback((e: React.MouseEvent | React.TouchEvent) => {
         if (!isDrawing || !currentDrawing) return;
@@ -205,7 +269,7 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
         setCurrentDrawing(null);
     }, [isDrawing, currentDrawing, drawings, onDrawingsUpdate]);
 
-    // Helper functions (keep your existing implementations)
+    // Helper functions (remain the same)
     const isPointNearLine = (
         px: number, py: number, 
         x1: number, y1: number, 
@@ -274,7 +338,7 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
     };
 
     const handleEraserAction = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-        if (activeTool !== 'eraser') return;
+        if (activeTool !== 'eraser' || showColorPicker) return;
         
         const pos = getEventPosition(e);
         if (!pos) return;
@@ -357,15 +421,23 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
             const updatedDrawings = drawings.filter(drawing => !drawingsToRemove.has(drawing.id));
             onDrawingsUpdate(updatedDrawings);
         }
-    }, [activeTool, getEventPosition, drawings, onDrawingsUpdate, chart, series]);
+    }, [activeTool, getEventPosition, drawings, onDrawingsUpdate, chart, series, showColorPicker]);
 
-    // Handle tool deactivation when clicking outside
+    // FIXED: Handle tool deactivation when clicking outside - improved logic
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-            if (!activeTool) return;
+            // Don't deactivate tool if we're currently drawing
+            if (isDrawingRef.current) return;
             
+            // Don't deactivate if eraser is active
+            if (isEraserActiveRef.current) return;
+            
+            if (!activeToolRef.current) return;
+            
+            // If click is outside the chart container and outside color picker/toolbar
             if (chartContainerRef.current && !chartContainerRef.current.contains(e.target as Node)) {
                 setActiveTool(null);
+                setShowColorPicker(false);
             }
         };
 
@@ -375,7 +447,17 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
             document.removeEventListener('mousedown', handleClickOutside);
             document.removeEventListener('touchstart', handleClickOutside);
         };
-    }, [activeTool, chartContainerRef]);
+    }, [chartContainerRef]);
+
+    // Add continuous eraser functionality for mouse move
+    const handleEraserMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+        if (activeTool !== 'eraser' || showColorPicker) return;
+        
+        // For mouse events, only handle eraser on move if left button is pressed
+        if ('button' in e && e.type === 'mousemove' && e.buttons !== 1) return;
+        
+        handleEraserAction(e);
+    }, [activeTool, handleEraserAction, showColorPicker]);
 
     return (
         <>
@@ -390,10 +472,10 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
             }}>
                 <Toolbar
                     activeTool={activeTool}
-                    onToolSelect={setActiveTool}
+                    onToolSelect={handleToolSelect}
                     selectedColor={selectedColor}
                     lineWidth={lineWidth}
-                    onColorPickerToggle={() => setShowColorPicker(!showColorPicker)}
+                    onColorPickerToggle={handleColorPickerToggle} // FIXED: Use dedicated toggle handler
                     showColorPicker={showColorPicker}
                     theme={config.theme}
                     isMobile={isMobile}
@@ -412,13 +494,13 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
                 }}>
                     <ColorPicker
                         selectedColor={selectedColor}
-                        onColorSelect={setSelectedColor}
+                        onColorSelect={handleColorSelect}
                         lineWidth={lineWidth}
-                        onLineWidthChange={setLineWidth}
+                        onLineWidthChange={handleLineWidthChange}
                         theme={config.theme}
                         isMobile={isMobile}
                         show={showColorPicker}
-                        onClose={() => setShowColorPicker(false)}
+                        onClose={handleColorPickerClose} // FIXED: Use dedicated close handler
                     />
                 </div>
             )}
@@ -432,31 +514,56 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
                         left: 0,
                         width: '100%',
                         height: '100%',
-                        pointerEvents: activeTool ? 'auto' : 'none',
-                        cursor: activeTool && !isDrawing ? 'crosshair' : 'default',
+                        // FIXED: Disable pointer events when color picker is open
+                        pointerEvents: (activeTool && !showColorPicker) ? 'auto' : 'none',
+                        cursor: activeTool === 'eraser' ? 'crosshair' : 
+                               (activeTool && !showColorPicker && !isDrawing) ? 'crosshair' : 'default',
                         zIndex: 15,
                         // Important for mobile touch events
-                        touchAction: activeTool ? 'none' : 'auto',
+                        touchAction: (activeTool && !showColorPicker) ? 'none' : 'auto',
                     }}
                     onMouseDown={(e) => {
+                        // FIXED: Don't handle drawing/eraser when color picker is open
+                        if (showColorPicker) return;
+                        
                         if (activeTool === 'eraser') {
                             handleEraserAction(e);
                         } else if (activeTool) {
                             handleDrawingStart(e);
                         }
                     }}
-                    onMouseMove={handleDrawingMove}
+                    onMouseMove={(e) => {
+                        if (showColorPicker) return;
+                        
+                        if (activeTool === 'eraser') {
+                            handleEraserMove(e);
+                        } else {
+                            handleDrawingMove(e);
+                        }
+                    }}
                     onMouseUp={handleDrawingEnd}
                     onMouseLeave={handleDrawingEnd}
+                    // NEW: Right-click handler to deactivate tools
+                    onContextMenu={handleRightClick}
                     // Touch events for mobile
                     onTouchStart={(e) => {
+                        if (showColorPicker) return;
+                        
                         if (activeTool === 'eraser') {
                             handleEraserAction(e);
                         } else if (activeTool) {
                             handleDrawingStart(e);
                         }
                     }}
-                    onTouchMove={handleDrawingMove}
+                    onTouchMove={(e) => {
+                        if (showColorPicker) return;
+                        
+                        if (activeTool === 'eraser') {
+                            handleEraserAction(e);
+                        } else {
+                            handleDrawingMove(e);
+                        }
+                    }}
                     onTouchEnd={handleDrawingEnd}
                     onTouchCancel={handleDrawingEnd}
                 >
