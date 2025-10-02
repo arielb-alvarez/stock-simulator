@@ -32,19 +32,19 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
     <div 
       style={{
         position: 'absolute',
-        top: isMobile ? 'auto' : '60px',
-        bottom: isMobile ? '40px' : 'auto',
-        left: isMobile ? '50%' : '45px',
-        transform: isMobile ? 'translateX(-50%)' : 'none',
+        top: '60px',
+        bottom: 'auto',
+        left: '45px',
+        transform: 'none',
         zIndex: 21,
         background: theme === 'dark' ? 'rgba(42, 46, 57, 0.98)' : 'rgba(255, 255, 255, 0.98)',
-        padding: isMobile ? '10px' : '12px',
+        padding: '12px',
         borderRadius: '8px',
         boxShadow: '0 2px 15px rgba(0, 0, 0, 0.3)',
         border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
         backdropFilter: 'blur(10px)',
-        minWidth: isMobile ? '250px' : '200px',
-        maxWidth: isMobile ? '90vw' : '220px'
+        minWidth: '200px',
+        maxWidth: '220px'
       }}
     >
       {/* Compact Header */}

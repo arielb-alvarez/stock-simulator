@@ -484,8 +484,8 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
             {showColorPicker && (
                 <div style={{
                     position: 'absolute',
-                    top: '60px',
-                    left: '10px',
+                    top: 0,
+                    left: 0,
                     zIndex: 21,
                     pointerEvents: 'auto',
                 }}>
