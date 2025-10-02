@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useCallback, useMemo, useRef, useEffect, useState } from 'react';
 import { IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { Drawing } from '../../types';
 
@@ -13,6 +13,14 @@ interface DrawingSurfaceProps {
   viewportVersion: number;
 }
 
+interface Coordinate { x: number; y: number; }
+
+interface RenderableDrawing {
+  id: string;
+  type: string;
+  elements: JSX.Element[];
+}
+
 const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
   chart,
   series,
@@ -23,70 +31,205 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
   activeTool,
   viewportVersion,
 }) => {
-  // Use refs to avoid triggering effects during render
+  const [renderableDrawings, setRenderableDrawings] = useState<RenderableDrawing[]>([]);
+  
   const chartRef = useRef(chart);
   const seriesRef = useRef(series);
+  const dimensionsRef = useRef(chartDimensions);
   
-  // Update refs when props change, but don't trigger re-renders
+  // Update refs
   useEffect(() => {
     chartRef.current = chart;
-  }, [chart]);
-  
-  useEffect(() => {
     seriesRef.current = series;
-  }, [series]);
+    dimensionsRef.current = chartDimensions;
+  });
 
-  const safeTimeToCoordinate = useCallback((time: number): number | null => {
-    const currentChart = chartRef.current;
-    if (!currentChart?.timeScale()) return null;
-    
-    try {
-      const chartTime = (time / 1000) as UTCTimestamp;
-      const coord = currentChart.timeScale().timeToCoordinate(chartTime);
-      return coord !== null && !isNaN(coord) && isFinite(coord) ? Math.round(coord) : null;
-    } catch (error) {
-      console.warn('Error converting time to coordinate:', error, time);
-      return null;
+  // Process saved drawings in effect - this runs when chart becomes available
+  useEffect(() => {
+    if (!chart || !series || chartDimensions.width === 0) {
+      setRenderableDrawings([]);
+      return;
     }
-  }, []); // Remove chart dependency since we use ref
 
-  const priceToCoordinate = useCallback((price: number): number | null => {
-    const currentSeries = seriesRef.current;
-    if (!currentSeries) return null;
-    
-    try {
-      const coord = currentSeries.priceToCoordinate(price);
-      return coord !== null && !isNaN(coord) && isFinite(coord) ? Math.round(coord) : null;
-    } catch (error) {
-      console.warn('Error converting price to coordinate:', error, price);
-      return null;
-    }
-  }, []); // Remove series dependency since we use ref
-
-  // Filter out invalid drawings and convert to renderable format
-  const renderableDrawings = useMemo(() => {
-    return drawings.filter(drawing => {
-      if (!drawing.points || drawing.points.length === 0) return false;
+    const safeTimeToCoordinate = (time: number): number | null => {
+      if (!chart?.timeScale()) return null;
       
-      // Check if at least one point is valid and visible
-      return drawing.points.some(point => {
-        const x = safeTimeToCoordinate(point.time);
-        const y = priceToCoordinate(point.price);
-        return x !== null && y !== null;
-      });
-    });
-  }, [drawings, safeTimeToCoordinate, priceToCoordinate]);
+      try {
+        const chartTime = (time / 1000) as UTCTimestamp;
+        const coord = chart.timeScale().timeToCoordinate(chartTime);
+        return coord !== null && !isNaN(coord) && isFinite(coord) ? Math.round(coord) : null;
+      } catch (error) {
+        return null;
+      }
+    };
 
-  const renderDrawing = useCallback((drawing: Drawing) => {
-    if (!drawing.points || drawing.points.length === 0) {
+    const priceToCoordinate = (price: number): number | null => {
+      if (!series) return null;
+      
+      try {
+        const coord = series.priceToCoordinate(price);
+        return coord !== null && !isNaN(coord) && isFinite(coord) ? Math.round(coord) : null;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    const createDrawingElement = (drawing: Drawing): RenderableDrawing | null => {
+      if (!drawing.points || drawing.points.length === 0) {
+        return null;
+      }
+
+      try {
+        const coordinates: Coordinate[] = [];
+        
+        for (const point of drawing.points) {
+          const x = safeTimeToCoordinate(point.time);
+          const y = priceToCoordinate(point.price);
+          
+          if (x !== null && y !== null) {
+            coordinates.push({ x, y });
+          }
+        }
+
+        if (coordinates.length === 0) return null;
+
+        const commonProps = {
+          stroke: drawing.color,
+          strokeWidth: drawing.width,
+          fill: 'none' as const,
+          vectorEffect: 'non-scaling-stroke' as const,
+        };
+
+        const elements: JSX.Element[] = [];
+
+        switch (drawing.type) {
+          case 'freehand':
+            if (coordinates.length < 2) return null;
+            elements.push(
+              <polyline
+                key="freehand"
+                {...commonProps}
+                points={coordinates.map(coord => `${coord.x},${coord.y}`).join(' ')}
+                fill="none"
+              />
+            );
+            break;
+          
+          case 'line':
+            if (coordinates.length !== 2) return null;
+            elements.push(
+              <line
+                key="line"
+                {...commonProps}
+                x1={coordinates[0].x}
+                y1={coordinates[0].y}
+                x2={coordinates[1].x}
+                y2={coordinates[1].y}
+              />
+            );
+            break;
+          
+          case 'rectangle':
+            if (coordinates.length !== 2) return null;
+            const rectX = Math.min(coordinates[0].x, coordinates[1].x);
+            const rectY = Math.min(coordinates[0].y, coordinates[1].y);
+            const rectWidth = Math.abs(coordinates[1].x - coordinates[0].x);
+            const rectHeight = Math.abs(coordinates[1].y - coordinates[0].y);
+            elements.push(
+              <rect
+                key="rectangle"
+                {...commonProps}
+                x={rectX}
+                y={rectY}
+                width={rectWidth}
+                height={rectHeight}
+                fill="none"
+              />
+            );
+            break;
+          
+          case 'circle':
+            if (coordinates.length !== 2) return null;
+            const centerX = coordinates[0].x;
+            const centerY = coordinates[0].y;
+            const radius = Math.sqrt(
+              Math.pow(coordinates[1].x - coordinates[0].x, 2) + 
+              Math.pow(coordinates[1].y - coordinates[0].y, 2)
+            );
+            elements.push(
+              <circle
+                key="circle"
+                {...commonProps}
+                cx={centerX}
+                cy={centerY}
+                r={radius}
+                fill="none"
+              />
+            );
+            break;
+          
+          default:
+            return null;
+        }
+
+        return {
+          id: drawing.id,
+          type: drawing.type,
+          elements
+        };
+      } catch (error) {
+        console.warn('Error creating drawing element:', error);
+        return null;
+      }
+    };
+
+    // Process saved drawings
+    const newRenderableDrawings: RenderableDrawing[] = [];
+    for (const drawing of drawings) {
+      const renderable = createDrawingElement(drawing);
+      if (renderable) {
+        newRenderableDrawings.push(renderable);
+      }
+    }
+    setRenderableDrawings(newRenderableDrawings);
+  }, [drawings, viewportVersion, chartDimensions, chart, series]); // Include chart and series in dependencies
+
+  // Handle current drawing separately for immediate responsiveness
+  const renderCurrentDrawing = useCallback(() => {
+    if (!currentDrawing || !currentDrawing.points || currentDrawing.points.length === 0) {
       return null;
     }
 
-    try {
-      // Get valid coordinates
-      const coordinates: {x: number; y: number}[] = [];
+    // Use refs for current drawing to avoid direct chart/series access during render
+    const safeTimeToCoordinate = (time: number): number | null => {
+      const currentChart = chartRef.current;
+      if (!currentChart?.timeScale()) return null;
       
-      for (const point of drawing.points) {
+      try {
+        const chartTime = (time / 1000) as UTCTimestamp;
+        const coord = currentChart.timeScale().timeToCoordinate(chartTime);
+        return coord !== null && !isNaN(coord) && isFinite(coord) ? Math.round(coord) : null;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    const priceToCoordinate = (price: number): number | null => {
+      const currentSeries = seriesRef.current;
+      if (!currentSeries) return null;
+      
+      try {
+        const coord = currentSeries.priceToCoordinate(price);
+        return coord !== null && !isNaN(coord) && isFinite(coord) ? Math.round(coord) : null;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    try {
+      const coordinates: Coordinate[] = [];
+      
+      for (const point of currentDrawing.points) {
         const x = safeTimeToCoordinate(point.time);
         const y = priceToCoordinate(point.price);
         
@@ -98,20 +241,18 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
       if (coordinates.length === 0) return null;
 
       const commonProps = {
-        stroke: drawing.color,
-        strokeWidth: drawing.width,
+        stroke: currentDrawing.color,
+        strokeWidth: currentDrawing.width,
         fill: 'none' as const,
         vectorEffect: 'non-scaling-stroke' as const,
       };
 
-      const drawingKey = `${drawing.id}-${viewportVersion}`;
-
-      switch (drawing.type) {
+      switch (currentDrawing.type) {
         case 'freehand':
           if (coordinates.length < 2) return null;
           return (
             <polyline
-              key={drawingKey}
+              key="current-freehand"
               {...commonProps}
               points={coordinates.map(coord => `${coord.x},${coord.y}`).join(' ')}
               fill="none"
@@ -122,7 +263,7 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
           if (coordinates.length !== 2) return null;
           return (
             <line
-              key={drawingKey}
+              key="current-line"
               {...commonProps}
               x1={coordinates[0].x}
               y1={coordinates[0].y}
@@ -139,7 +280,7 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
           const rectHeight = Math.abs(coordinates[1].y - coordinates[0].y);
           return (
             <rect
-              key={drawingKey}
+              key="current-rectangle"
               {...commonProps}
               x={rectX}
               y={rectY}
@@ -159,7 +300,7 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
           );
           return (
             <circle
-              key={drawingKey}
+              key="current-circle"
               {...commonProps}
               cx={centerX}
               cy={centerY}
@@ -169,22 +310,15 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
           );
         
         default:
-          console.warn('Unknown drawing type:', drawing.type);
           return null;
       }
     } catch (error) {
-      console.error('Error rendering drawing:', error, drawing);
+      console.warn('Error rendering current drawing:', error);
       return null;
     }
-  }, [safeTimeToCoordinate, priceToCoordinate, viewportVersion]);
+  }, [currentDrawing]);
 
-  // Render current drawing separately to ensure it's always visible
-  const renderCurrentDrawing = useCallback(() => {
-    if (!currentDrawing) return null;
-    return renderDrawing(currentDrawing);
-  }, [currentDrawing, renderDrawing]);
-
-  if (!chartRef.current || !seriesRef.current || chartDimensions.width === 0 || chartDimensions.height === 0) {
+  if (!chart || !series || chartDimensions.width === 0 || chartDimensions.height === 0) {
     return null;
   }
 
@@ -202,12 +336,16 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
       key={`drawing-surface-${viewportVersion}`}
     >
       {/* Render all saved drawings */}
-      {renderableDrawings.map(drawing => renderDrawing(drawing))}
+      {renderableDrawings.map(drawing => (
+        <g key={drawing.id}>
+          {drawing.elements}
+        </g>
+      ))}
       
-      {/* Render current drawing in progress */}
+      {/* Render current drawing in progress - calculated during render for immediate response */}
       {renderCurrentDrawing()}
     </svg>
   );
 };
 
-export default DrawingSurface;
+export default React.memo(DrawingSurface);
