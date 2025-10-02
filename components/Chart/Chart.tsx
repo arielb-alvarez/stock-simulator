@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { createChart, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
+import { createChart, CrosshairMode, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { CandleStickData, ChartConfig, Drawing } from '../../types';
 import ChartContainer from './ChartContainer';
 import DrawingLayer from './DrawingLayer';
@@ -68,7 +68,7 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
                 secondsVisible: false,
             },
             crosshair: {
-                mode: 1, // Enable crosshair
+                mode: CrosshairMode.Normal, // Enable crosshair
             },
         } as any);
 
