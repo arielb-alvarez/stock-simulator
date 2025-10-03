@@ -509,8 +509,8 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
                         position: 'absolute',
                         top: 0,
                         left: 0,
-                        width: '100%',
-                        height: '100%',
+                        width: "calc(100% - 76px)",
+                        height: "calc(100% - 28px)",
                         // FIXED: Disable pointer events when color picker is open
                         pointerEvents: (activeTool && !showColorPicker) ? 'auto' : 'none',
                         cursor: activeTool === 'eraser' ? 'crosshair' : 
