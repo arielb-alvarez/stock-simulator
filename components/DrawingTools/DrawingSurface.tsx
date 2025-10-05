@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { Drawing } from '../../types';
 
@@ -44,7 +44,7 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
     dimensionsRef.current = chartDimensions;
   });
 
-  // Process saved drawings in effect - this runs when chart becomes available
+  // FIXED: Improved drawing processing with better error handling
   useEffect(() => {
     if (!chart || !series || chartDimensions.width === 0) {
       setRenderableDrawings([]);
@@ -52,24 +52,51 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
     }
 
     const safeTimeToCoordinate = (time: number): number | null => {
-      if (!chart?.timeScale()) return null;
+      const currentChart = chartRef.current;
+      if (!currentChart?.timeScale()) return null;
       
       try {
-        const chartTime = (time / 1000) as UTCTimestamp;
-        const coord = chart.timeScale().timeToCoordinate(chartTime);
-        return coord !== null && !isNaN(coord) && isFinite(coord) ? Math.round(coord) : null;
+        // FIXED: Use the stored time directly as UTCTimestamp
+        const chartTime = time as UTCTimestamp;
+        const coord = currentChart.timeScale().timeToCoordinate(chartTime);
+        
+        // FIXED: Better validation for coordinates
+        if (coord === null || isNaN(coord) || !isFinite(coord)) {
+          return null;
+        }
+        
+        // FIXED: Ensure coordinate is within visible area
+        const roundedCoord = Math.round(coord);
+        if (roundedCoord < -1000 || roundedCoord > chartDimensions.width + 1000) {
+          return null; // Too far outside viewport
+        }
+        
+        return roundedCoord;
       } catch (error) {
+        console.warn('Error converting time to coordinate:', time, error);
         return null;
       }
     };
 
     const priceToCoordinate = (price: number): number | null => {
-      if (!series) return null;
+      const currentSeries = seriesRef.current;
+      if (!currentSeries) return null;
       
       try {
-        const coord = series.priceToCoordinate(price);
-        return coord !== null && !isNaN(coord) && isFinite(coord) ? Math.round(coord) : null;
+        const coord = currentSeries.priceToCoordinate(price);
+        
+        if (coord === null || isNaN(coord) || !isFinite(coord)) {
+          return null;
+        }
+        
+        const roundedCoord = Math.round(coord);
+        if (roundedCoord < -1000 || roundedCoord > chartDimensions.height + 1000) {
+          return null;
+        }
+        
+        return roundedCoord;
       } catch (error) {
+        console.warn('Error converting price to coordinate:', price, error);
         return null;
       }
     };
@@ -81,6 +108,7 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
 
       try {
         const coordinates: Coordinate[] = [];
+        let validPoints = 0;
         
         for (const point of drawing.points) {
           const x = safeTimeToCoordinate(point.time);
@@ -88,10 +116,18 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
           
           if (x !== null && y !== null) {
             coordinates.push({ x, y });
+            validPoints++;
           }
         }
 
-        if (coordinates.length === 0) return null;
+        // FIXED: Allow partial rendering for freehand drawings
+        if (validPoints === 0) return null;
+        
+        // For non-freehand drawings, we need all required points
+        if (drawing.type !== 'freehand') {
+          const requiredPoints = drawing.type === 'line' ? 2 : 2;
+          if (validPoints < requiredPoints) return null;
+        }
 
         const commonProps = {
           stroke: drawing.color,
@@ -116,56 +152,59 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
             break;
           
           case 'line':
-            if (coordinates.length !== 2) return null;
-            elements.push(
-              <line
-                key="line"
-                {...commonProps}
-                x1={coordinates[0].x}
-                y1={coordinates[0].y}
-                x2={coordinates[1].x}
-                y2={coordinates[1].y}
-              />
-            );
+            if (coordinates.length >= 2) {
+              elements.push(
+                <line
+                  key="line"
+                  {...commonProps}
+                  x1={coordinates[0].x}
+                  y1={coordinates[0].y}
+                  x2={coordinates[1].x}
+                  y2={coordinates[1].y}
+                />
+              );
+            }
             break;
           
           case 'rectangle':
-            if (coordinates.length !== 2) return null;
-            const rectX = Math.min(coordinates[0].x, coordinates[1].x);
-            const rectY = Math.min(coordinates[0].y, coordinates[1].y);
-            const rectWidth = Math.abs(coordinates[1].x - coordinates[0].x);
-            const rectHeight = Math.abs(coordinates[1].y - coordinates[0].y);
-            elements.push(
-              <rect
-                key="rectangle"
-                {...commonProps}
-                x={rectX}
-                y={rectY}
-                width={rectWidth}
-                height={rectHeight}
-                fill="none"
-              />
-            );
+            if (coordinates.length >= 2) {
+              const rectX = Math.min(coordinates[0].x, coordinates[1].x);
+              const rectY = Math.min(coordinates[0].y, coordinates[1].y);
+              const rectWidth = Math.abs(coordinates[1].x - coordinates[0].x);
+              const rectHeight = Math.abs(coordinates[1].y - coordinates[0].y);
+              elements.push(
+                <rect
+                  key="rectangle"
+                  {...commonProps}
+                  x={rectX}
+                  y={rectY}
+                  width={rectWidth}
+                  height={rectHeight}
+                  fill="none"
+                />
+              );
+            }
             break;
           
           case 'circle':
-            if (coordinates.length !== 2) return null;
-            const centerX = coordinates[0].x;
-            const centerY = coordinates[0].y;
-            const radius = Math.sqrt(
-              Math.pow(coordinates[1].x - coordinates[0].x, 2) + 
-              Math.pow(coordinates[1].y - coordinates[0].y, 2)
-            );
-            elements.push(
-              <circle
-                key="circle"
-                {...commonProps}
-                cx={centerX}
-                cy={centerY}
-                r={radius}
-                fill="none"
-              />
-            );
+            if (coordinates.length >= 2) {
+              const centerX = coordinates[0].x;
+              const centerY = coordinates[0].y;
+              const radius = Math.sqrt(
+                Math.pow(coordinates[1].x - coordinates[0].x, 2) + 
+                Math.pow(coordinates[1].y - coordinates[0].y, 2)
+              );
+              elements.push(
+                <circle
+                  key="circle"
+                  {...commonProps}
+                  cx={centerX}
+                  cy={centerY}
+                  r={radius}
+                  fill="none"
+                />
+              );
+            }
             break;
           
           default:
@@ -178,7 +217,7 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
           elements
         };
       } catch (error) {
-        console.warn('Error creating drawing element:', error);
+        console.warn('Error creating drawing element:', drawing.id, error);
         return null;
       }
     };
@@ -191,22 +230,22 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
         newRenderableDrawings.push(renderable);
       }
     }
+    
     setRenderableDrawings(newRenderableDrawings);
-  }, [drawings, viewportVersion, chartDimensions, chart, series]); // Include chart and series in dependencies
+  }, [drawings, viewportVersion, chartDimensions, chart, series]);
 
-  // Handle current drawing separately for immediate responsiveness
+  // FIXED: Current drawing rendering
   const renderCurrentDrawing = useCallback(() => {
     if (!currentDrawing || !currentDrawing.points || currentDrawing.points.length === 0) {
       return null;
     }
 
-    // Use refs for current drawing to avoid direct chart/series access during render
     const safeTimeToCoordinate = (time: number): number | null => {
       const currentChart = chartRef.current;
       if (!currentChart?.timeScale()) return null;
       
       try {
-        const chartTime = (time / 1000) as UTCTimestamp;
+        const chartTime = time as UTCTimestamp;
         const coord = currentChart.timeScale().timeToCoordinate(chartTime);
         return coord !== null && !isNaN(coord) && isFinite(coord) ? Math.round(coord) : null;
       } catch (error) {
@@ -260,62 +299,66 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
           );
         
         case 'line':
-          if (coordinates.length !== 2) return null;
-          return (
-            <line
-              key="current-line"
-              {...commonProps}
-              x1={coordinates[0].x}
-              y1={coordinates[0].y}
-              x2={coordinates[1].x}
-              y2={coordinates[1].y}
-            />
-          );
+          if (coordinates.length >= 2) {
+            return (
+              <line
+                key="current-line"
+                {...commonProps}
+                x1={coordinates[0].x}
+                y1={coordinates[0].y}
+                x2={coordinates[1].x}
+                y2={coordinates[1].y}
+              />
+            );
+          }
+          break;
         
         case 'rectangle':
-          if (coordinates.length !== 2) return null;
-          const rectX = Math.min(coordinates[0].x, coordinates[1].x);
-          const rectY = Math.min(coordinates[0].y, coordinates[1].y);
-          const rectWidth = Math.abs(coordinates[1].x - coordinates[0].x);
-          const rectHeight = Math.abs(coordinates[1].y - coordinates[0].y);
-          return (
-            <rect
-              key="current-rectangle"
-              {...commonProps}
-              x={rectX}
-              y={rectY}
-              width={rectWidth}
-              height={rectHeight}
-              fill="none"
-            />
-          );
+          if (coordinates.length >= 2) {
+            const rectX = Math.min(coordinates[0].x, coordinates[1].x);
+            const rectY = Math.min(coordinates[0].y, coordinates[1].y);
+            const rectWidth = Math.abs(coordinates[1].x - coordinates[0].x);
+            const rectHeight = Math.abs(coordinates[1].y - coordinates[0].y);
+            return (
+              <rect
+                key="current-rectangle"
+                {...commonProps}
+                x={rectX}
+                y={rectY}
+                width={rectWidth}
+                height={rectHeight}
+                fill="none"
+              />
+            );
+          }
+          break;
         
         case 'circle':
-          if (coordinates.length !== 2) return null;
-          const centerX = coordinates[0].x;
-          const centerY = coordinates[0].y;
-          const radius = Math.sqrt(
-            Math.pow(coordinates[1].x - coordinates[0].x, 2) + 
-            Math.pow(coordinates[1].y - coordinates[0].y, 2)
-          );
-          return (
-            <circle
-              key="current-circle"
-              {...commonProps}
-              cx={centerX}
-              cy={centerY}
-              r={radius}
-              fill="none"
-            />
-          );
-        
-        default:
-          return null;
+          if (coordinates.length >= 2) {
+            const centerX = coordinates[0].x;
+            const centerY = coordinates[0].y;
+            const radius = Math.sqrt(
+              Math.pow(coordinates[1].x - coordinates[0].x, 2) + 
+              Math.pow(coordinates[1].y - coordinates[0].y, 2)
+            );
+            return (
+              <circle
+                key="current-circle"
+                {...commonProps}
+                cx={centerX}
+                cy={centerY}
+                r={radius}
+                fill="none"
+              />
+            );
+          }
+          break;
       }
     } catch (error) {
       console.warn('Error rendering current drawing:', error);
-      return null;
     }
+    
+    return null;
   }, [currentDrawing]);
 
   if (!chart || !series || chartDimensions.width === 0 || chartDimensions.height === 0) {
@@ -342,7 +385,7 @@ const DrawingSurface: React.FC<DrawingSurfaceProps> = ({
         </g>
       ))}
       
-      {/* Render current drawing in progress - calculated during render for immediate response */}
+      {/* Render current drawing in progress */}
       {renderCurrentDrawing()}
     </svg>
   );
