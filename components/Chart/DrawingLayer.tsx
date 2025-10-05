@@ -17,10 +17,17 @@ interface DrawingLayerProps {
     chartContainerRef: React.RefObject<HTMLDivElement>;
 }
 
-const timeToMilliseconds = (time: any): number => {
-    if (typeof time === 'number') return time * 1000;
-    if (typeof time === 'string') return new Date(time).getTime();
-    return Date.now();
+// FIXED: Use the exact same time format as your chart data
+const normalizeTime = (time: any): UTCTimestamp => {
+    if (typeof time === 'number') {
+        // If it's already a UTCTimestamp (seconds), return it
+        // If it's milliseconds, convert to seconds
+        return time > 10000000000 ? Math.floor(time / 1000) as UTCTimestamp : time as UTCTimestamp;
+    }
+    if (typeof time === 'string') {
+        return Math.floor(new Date(time).getTime() / 1000) as UTCTimestamp;
+    }
+    return Math.floor(Date.now() / 1000) as UTCTimestamp;
 };
 
 const DrawingLayer: React.FC<DrawingLayerProps> = ({
@@ -54,57 +61,7 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
         activeToolRef.current = activeTool;
     }, [isDrawing, activeTool]);
 
-    // FIXED: Tool selection handler - only handle tool selection, not color picker
-    const handleToolSelect = useCallback((tool: string | null) => {
-        // Toggle off if the same tool is clicked again
-        if (activeTool === tool) {
-            setActiveTool(null);
-        } else {
-            setActiveTool(tool);
-        }
-        // Always close color picker when changing tools
-        setShowColorPicker(false);
-    }, [activeTool]);
-
-    // FIXED: Color picker toggle handler
-    const handleColorPickerToggle = useCallback(() => {
-        setShowColorPicker(prev => !prev);
-    }, []);
-
-    // FIXED: Color selection handler - don't change active tool
-    const handleColorSelect = useCallback((color: string) => {
-        setSelectedColor(color);
-        // Keep the color picker open after selection for potential further adjustments
-        // setShowColorPicker(false); // Removed this line to keep picker open
-    }, []);
-
-    const handleLineWidthChange = useCallback((width: number) => {
-        setLineWidth(width);
-    }, []);
-
-    // FIXED: Close color picker handler
-    const handleColorPickerClose = useCallback(() => {
-        setShowColorPicker(false);
-    }, []);
-
-    // NEW: Right-click handler to deactivate active tool
-    const handleRightClick = useCallback((e: React.MouseEvent) => {
-        // Only handle if there's an active tool or color picker is open
-        if (activeTool || showColorPicker) {
-            e.preventDefault(); // Prevent default context menu
-            e.stopPropagation();
-            
-            setActiveTool(null);
-            setShowColorPicker(false);
-            
-            // If we were in the middle of drawing, cancel it
-            if (isDrawing) {
-                setIsDrawing(false);
-                setCurrentDrawing(null);
-            }
-        }
-    }, [activeTool, showColorPicker, isDrawing]);
-
+    // FIXED: Enhanced viewport change handler with better timeframe detection
     useEffect(() => {
         if (!chart || !series) return;
 
@@ -114,11 +71,7 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
             clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
                 setViewportVersion(prev => prev + 1);
-            }, 50);
-        };
-
-        const handleContainerMouseUp = () => {
-            handleViewportChange();
+            }, 150);
         };
 
         const timeScale = chart.timeScale();
@@ -126,34 +79,33 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
         timeScale.subscribeVisibleLogicalRangeChange(handleViewportChange);
         
         chart.subscribeCrosshairMove(handleViewportChange);
-        chart.subscribeClick(handleViewportChange);
 
-        const chartContainer = chartContainerRef.current;
-        if (chartContainer) {
-            chartContainer.addEventListener('mouseup', handleContainerMouseUp);
-            chartContainer.addEventListener('touchend', handleContainerMouseUp);
-        }
+        // FIXED: More aggressive update on timeframe changes
+        const forceUpdate = () => {
+            setViewportVersion(prev => prev + 1);
+        };
+
+        // Force update after a short delay when component mounts or timeframe changes
+        const initialUpdate = setTimeout(forceUpdate, 300);
+        const timeframeUpdate = setTimeout(forceUpdate, 500);
 
         return () => {
             clearTimeout(timeoutId);
+            clearTimeout(initialUpdate);
+            clearTimeout(timeframeUpdate);
             timeScale.unsubscribeVisibleTimeRangeChange(handleViewportChange);
             timeScale.unsubscribeVisibleLogicalRangeChange(handleViewportChange);
             chart.unsubscribeCrosshairMove(handleViewportChange);
-            chart.unsubscribeClick(handleViewportChange);
-            
-            if (chartContainer) {
-                chartContainer.removeEventListener('mouseup', handleContainerMouseUp);
-                chartContainer.removeEventListener('touchend', handleContainerMouseUp);
-            }
         };
-    }, [chart, series, chartContainerRef]);
+    }, [chart, series, timeframe]); // timeframe dependency
 
-    const validateAndConvertPoint = (
-        chart: IChartApi, 
-        series: ISeriesApi<'Candlestick'>, 
+    // FIXED: Improved coordinate validation
+    const validateAndConvertPoint = useCallback((
         x: number, 
         y: number
     ) => {
+        if (!chart || !series) return null;
+        
         try {
             const time = chart.timeScale().coordinateToTime(x);
             if (time === null) return null;
@@ -161,13 +113,20 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
             const price = series.coordinateToPrice(y);
             if (price === null || isNaN(price)) return null;
 
-            const timeInMs = timeToMilliseconds(time);
-            return isNaN(timeInMs) ? null : { time: timeInMs, price, x, y };
+            // FIXED: Use normalized time that matches chart data format
+            const normalizedTime = normalizeTime(time);
+            
+            return { 
+                time: normalizedTime, 
+                price, 
+                x, 
+                y 
+            };
         } catch (error) {
             console.error('Error converting coordinates:', error);
             return null;
         }
-    };
+    }, [chart, series]);
 
     // Unified function to get position from both mouse and touch events
     const getEventPosition = useCallback((e: React.MouseEvent | React.TouchEvent) => {
@@ -177,12 +136,10 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
         let clientX: number, clientY: number;
 
         if ('touches' in e) {
-            // Touch event
             if (e.touches.length === 0) return null;
             clientX = e.touches[0].clientX;
             clientY = e.touches[0].clientY;
         } else {
-            // Mouse event
             clientX = e.clientX;
             clientY = e.clientY;
         }
@@ -190,17 +147,15 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
         const x = clientX - rect.left;
         const y = clientY - rect.top;
 
-        return validateAndConvertPoint(chart, series, x, y);
-    }, [chart, series, chartContainerRef]);
+        return validateAndConvertPoint(x, y);
+    }, [chart, series, chartContainerRef, validateAndConvertPoint]);
 
     const handleDrawingStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-        // FIXED: Don't start drawing if color picker is open
         if (!activeTool || activeTool === 'eraser' || showColorPicker) return;
         
         const pos = getEventPosition(e);
         if (!pos) return;
 
-        // Prevent default for touch events to avoid scrolling
         if ('touches' in e) {
             e.preventDefault();
             e.stopPropagation();
@@ -214,7 +169,7 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
             points: [{ time: pos.time, price: pos.price }],
             color: selectedColor,
             width: lineWidth,
-            createdAt: Date.now()
+            createdAt: normalizeTime(Date.now())
         };
 
         setCurrentDrawing(newDrawing);
@@ -226,7 +181,6 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
         const pos = getEventPosition(e);
         if (!pos) return;
 
-        // Prevent default for touch events to avoid scrolling
         if ('touches' in e) {
             e.preventDefault();
             e.stopPropagation();
@@ -254,7 +208,6 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
     const handleDrawingEnd = useCallback((e: React.MouseEvent | React.TouchEvent) => {
         if (!isDrawing || !currentDrawing) return;
 
-        // Prevent default for touch events
         if ('touches' in e) {
             e.preventDefault();
             e.stopPropagation();
@@ -269,7 +222,93 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
         setCurrentDrawing(null);
     }, [isDrawing, currentDrawing, drawings, onDrawingsUpdate]);
 
-    // Helper functions (remain the same)
+    // FIXED: Improved eraser action
+    const handleEraserAction = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+        if (activeTool !== 'eraser' || showColorPicker) return;
+        
+        const pos = getEventPosition(e);
+        if (!pos) return;
+
+        if ('touches' in e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        const drawingsToRemove = new Set<string>();
+        
+        drawings.forEach(drawing => {
+            let shouldRemove = false;
+
+            switch (drawing.type) {
+                case 'freehand':
+                    shouldRemove = drawing.points.some(point => {
+                        try {
+                            const pointX = chart?.timeScale().timeToCoordinate(point.time as UTCTimestamp);
+                            const pointY = series?.priceToCoordinate(point.price);
+                            return pointX !== null && pointY !== null && 
+                            Math.abs(pointX - pos.x!) < 20 && Math.abs(pointY - pos.y!) < 20;
+                        } catch (error) {
+                            return false;
+                        }
+                    });
+                    break;
+
+                case 'line':
+                    if (drawing.points.length === 2) {
+                        const [p1, p2] = drawing.points;
+                        const x1 = chart?.timeScale().timeToCoordinate(p1.time as UTCTimestamp);
+                        const y1 = series?.priceToCoordinate(p1.price);
+                        const x2 = chart?.timeScale().timeToCoordinate(p2.time as UTCTimestamp);
+                        const y2 = series?.priceToCoordinate(p2.price);
+                        
+                        if (x1 !== null && y1 !== null && x2 !== null && y2 !== null) {
+                            shouldRemove = isPointNearLine(pos.x!, pos.y!, x1, y1, x2, y2, 15);
+                        }
+                    }
+                    break;
+
+                case 'rectangle':
+                    if (drawing.points.length === 2) {
+                        const [p1, p2] = drawing.points;
+                        const x1 = chart?.timeScale().timeToCoordinate(p1.time as UTCTimestamp);
+                        const y1 = series?.priceToCoordinate(p1.price);
+                        const x2 = chart?.timeScale().timeToCoordinate(p2.time as UTCTimestamp);
+                        const y2 = series?.priceToCoordinate(p2.price);
+                        
+                        if (x1 !== null && y1 !== null && x2 !== null && y2 !== null) {
+                            shouldRemove = isPointNearRectangle(pos.x!, pos.y!, x1, y1, x2, y2, 10);
+                        }
+                    }
+                    break;
+
+                case 'circle':
+                    if (drawing.points.length === 2) {
+                        const [center, edge] = drawing.points;
+                        const centerX = chart?.timeScale().timeToCoordinate(center.time as UTCTimestamp);
+                        const centerY = series?.priceToCoordinate(center.price);
+                        const edgeX = chart?.timeScale().timeToCoordinate(edge.time as UTCTimestamp);
+                        const edgeY = series?.priceToCoordinate(edge.price);
+                        
+                        if (centerX !== null && centerY !== null && edgeX !== null && edgeY !== null) {
+                            const radius = Math.sqrt(Math.pow(edgeX - centerX, 2) + Math.pow(edgeY - centerY, 2));
+                            shouldRemove = isPointNearCircle(pos.x!, pos.y!, centerX, centerY, radius, 10);
+                        }
+                    }
+                    break;
+            }
+
+            if (shouldRemove) {
+                drawingsToRemove.add(drawing.id);
+            }
+        });
+
+        if (drawingsToRemove.size > 0) {
+            const updatedDrawings = drawings.filter(drawing => !drawingsToRemove.has(drawing.id));
+            onDrawingsUpdate(updatedDrawings);
+        }
+    }, [activeTool, getEventPosition, drawings, onDrawingsUpdate, chart, series, showColorPicker]);
+
+    // Helper functions (keep the same)
     const isPointNearLine = (
         px: number, py: number, 
         x1: number, y1: number, 
@@ -337,127 +376,55 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
         return Math.abs(distance - radius) <= tolerance;
     };
 
-    const handleEraserAction = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-        if (activeTool !== 'eraser' || showColorPicker) return;
-        
-        const pos = getEventPosition(e);
-        if (!pos) return;
-
-        // Prevent default for touch events
-        if ('touches' in e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        const drawingsToRemove = new Set<string>();
-        
-        drawings.forEach(drawing => {
-            let shouldRemove = false;
-
-            switch (drawing.type) {
-                case 'freehand':
-                    shouldRemove = drawing.points.some(point => {
-                        try {
-                            const pointX = chart.timeScale().timeToCoordinate(point.time / 1000 as UTCTimestamp);
-                            const pointY = series.priceToCoordinate(point.price);
-                            return pointX !== null && pointY !== null && 
-                            Math.abs(pointX - pos.x!) < 20 && Math.abs(pointY - pos.y!) < 20;
-                        } catch (error) {
-                            return false;
-                        }
-                    });
-                    break;
-
-                case 'line':
-                    if (drawing.points.length === 2) {
-                        const [p1, p2] = drawing.points;
-                        const x1 = chart.timeScale().timeToCoordinate(p1.time / 1000 as UTCTimestamp);
-                        const y1 = series.priceToCoordinate(p1.price);
-                        const x2 = chart.timeScale().timeToCoordinate(p2.time / 1000 as UTCTimestamp);
-                        const y2 = series.priceToCoordinate(p2.price);
-                        
-                        if (x1 !== null && y1 !== null && x2 !== null && y2 !== null) {
-                            shouldRemove = isPointNearLine(pos.x!, pos.y!, x1, y1, x2, y2, 15);
-                        }
-                    }
-                    break;
-
-                case 'rectangle':
-                    if (drawing.points.length === 2) {
-                        const [p1, p2] = drawing.points;
-                        const x1 = chart.timeScale().timeToCoordinate(p1.time / 1000 as UTCTimestamp);
-                        const y1 = series.priceToCoordinate(p1.price);
-                        const x2 = chart.timeScale().timeToCoordinate(p2.time / 1000 as UTCTimestamp);
-                        const y2 = series.priceToCoordinate(p2.price);
-                        
-                        if (x1 !== null && y1 !== null && x2 !== null && y2 !== null) {
-                            shouldRemove = isPointNearRectangle(pos.x!, pos.y!, x1, y1, x2, y2, 10);
-                        }
-                    }
-                    break;
-
-                case 'circle':
-                    if (drawing.points.length === 2) {
-                        const [center, edge] = drawing.points;
-                        const centerX = chart.timeScale().timeToCoordinate(center.time / 1000 as UTCTimestamp);
-                        const centerY = series.priceToCoordinate(center.price);
-                        const edgeX = chart.timeScale().timeToCoordinate(edge.time / 1000 as UTCTimestamp);
-                        const edgeY = series.priceToCoordinate(edge.price);
-                        
-                        if (centerX !== null && centerY !== null && edgeX !== null && edgeY !== null) {
-                            const radius = Math.sqrt(Math.pow(edgeX - centerX, 2) + Math.pow(edgeY - centerY, 2));
-                            shouldRemove = isPointNearCircle(pos.x!, pos.y!, centerX, centerY, radius, 10);
-                        }
-                    }
-                    break;
-            }
-
-            if (shouldRemove) {
-                drawingsToRemove.add(drawing.id);
-            }
-        });
-
-        if (drawingsToRemove.size > 0) {
-            const updatedDrawings = drawings.filter(drawing => !drawingsToRemove.has(drawing.id));
-            onDrawingsUpdate(updatedDrawings);
-        }
-    }, [activeTool, getEventPosition, drawings, onDrawingsUpdate, chart, series, showColorPicker]);
-
-    // FIXED: Handle tool deactivation when clicking outside - improved logic
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-            // Don't deactivate tool if we're currently drawing
-            if (isDrawingRef.current) return;
-            
-            // Don't deactivate if eraser is active
-            if (isEraserActiveRef.current) return;
-            
-            if (!activeToolRef.current) return;
-            
-            // If click is outside the chart container and outside color picker/toolbar
-            if (chartContainerRef.current && !chartContainerRef.current.contains(e.target as Node)) {
-                setActiveTool(null);
-                setShowColorPicker(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        document.addEventListener('touchstart', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-            document.removeEventListener('touchstart', handleClickOutside);
-        };
-    }, [chartContainerRef]);
-
-    // Add continuous eraser functionality for mouse move
+    // FIXED: Continuous eraser functionality
     const handleEraserMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
         if (activeTool !== 'eraser' || showColorPicker) return;
         
-        // For mouse events, only handle eraser on move if left button is pressed
         if ('button' in e && e.type === 'mousemove' && e.buttons !== 1) return;
         
         handleEraserAction(e);
     }, [activeTool, handleEraserAction, showColorPicker]);
+
+    // FIXED: Tool selection handler
+    const handleToolSelect = useCallback((tool: string | null) => {
+        if (activeTool === tool) {
+            setActiveTool(null);
+        } else {
+            setActiveTool(tool);
+        }
+        setShowColorPicker(false);
+    }, [activeTool]);
+
+    const handleColorPickerToggle = useCallback(() => {
+        setShowColorPicker(prev => !prev);
+    }, []);
+
+    const handleColorSelect = useCallback((color: string) => {
+        setSelectedColor(color);
+    }, []);
+
+    const handleLineWidthChange = useCallback((width: number) => {
+        setLineWidth(width);
+    }, []);
+
+    const handleColorPickerClose = useCallback(() => {
+        setShowColorPicker(false);
+    }, []);
+
+    const handleRightClick = useCallback((e: React.MouseEvent) => {
+        if (activeTool || showColorPicker) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            setActiveTool(null);
+            setShowColorPicker(false);
+            
+            if (isDrawing) {
+                setIsDrawing(false);
+                setCurrentDrawing(null);
+            }
+        }
+    }, [activeTool, showColorPicker, isDrawing]);
 
     return (
         <>
@@ -502,7 +469,7 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
                 </div>
             )}
 
-            {/* Single Drawing Surface with both mouse and touch support */}
+            {/* FIXED: Enhanced drawing surface with better timeframe handling */}
             {chart && series && chartDimensions.width > 0 && chartDimensions.height > 0 && (
                 <div 
                     style={{
@@ -511,16 +478,13 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
                         left: 0,
                         width: "calc(100% - 76px)",
                         height: "calc(100% - 28px)",
-                        // FIXED: Disable pointer events when color picker is open
                         pointerEvents: (activeTool && !showColorPicker) ? 'auto' : 'none',
                         cursor: activeTool === 'eraser' ? 'crosshair' : 
                                (activeTool && !showColorPicker && !isDrawing) ? 'crosshair' : 'default',
                         zIndex: 15,
-                        // Important for mobile touch events
                         touchAction: (activeTool && !showColorPicker) ? 'none' : 'auto',
                     }}
                     onMouseDown={(e) => {
-                        // FIXED: Don't handle drawing/eraser when color picker is open
                         if (showColorPicker) return;
                         
                         if (activeTool === 'eraser') {
@@ -540,9 +504,7 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
                     }}
                     onMouseUp={handleDrawingEnd}
                     onMouseLeave={handleDrawingEnd}
-                    // NEW: Right-click handler to deactivate tools
                     onContextMenu={handleRightClick}
-                    // Touch events for mobile
                     onTouchStart={(e) => {
                         if (showColorPicker) return;
                         
@@ -565,7 +527,7 @@ const DrawingLayer: React.FC<DrawingLayerProps> = ({
                     onTouchCancel={handleDrawingEnd}
                 >
                     <DrawingSurface
-                        key={`drawing-surface-${viewportVersion}`}
+                        key={`drawing-surface-${viewportVersion}-${timeframe}-${chartDimensions.width}x${chartDimensions.height}`}
                         chart={chart}
                         series={series}
                         drawings={drawings}
