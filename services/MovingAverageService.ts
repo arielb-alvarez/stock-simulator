@@ -115,7 +115,7 @@ class MovingAverageConfigManager {
       {
         period: 20,
         color: '#3B82F6',
-        lineWidth: 2,
+        lineWidth: 1,
         type: 'sma',
         priceSource: 'close',
         visible: true

@@ -43,7 +43,6 @@ const Header: React.FC<HeaderProps> = ({
           title="Clear Drawings"
         >
           <ClearIcon color="white" />
-          <span>Clear</span>
         </button>
         
         <ThemeSelector config={config} onConfigChange={onConfigChange} />

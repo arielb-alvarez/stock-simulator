@@ -19,7 +19,7 @@ const MovingAverageConfigDialog: React.FC<MovingAverageConfigDialogProps> = ({
     const [config, setConfig] = useState<MovingAverageConfig>({
         period: 20,
         color: '#3B82F6',
-        lineWidth: 2, // Only 1, 2, 3, or 4
+        lineWidth: 1, // Only 1, 2, 3, or 4
         type: 'sma',
         priceSource: 'close'
     });
