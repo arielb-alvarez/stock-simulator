@@ -71,6 +71,7 @@ const Home: React.FC = () => {
           flex-direction: column;
           height: 100vh;
           overflow: hidden;
+          padding: 8px;
         }
 
         .container.dark {
@@ -88,6 +89,12 @@ const Home: React.FC = () => {
           display: flex;
           min-height: 0;
           position: relative;
+        }
+
+        @media (max-width: 768px) {
+          .container {
+            padding: 6px;
+          }
         }
       `}</style>
     </div>

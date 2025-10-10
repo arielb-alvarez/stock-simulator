@@ -1,3 +1,5 @@
+import { UTCTimestamp } from "lightweight-charts";
+
 export interface TradeData {
   e: string;     // Event type
   E: number;     // Event time
@@ -23,7 +25,7 @@ export interface CandleStickData {
   high: number;
   low: number;
   close: number;
-  volume: number;
+  volume?: number;
 }
 
 export interface Drawing {
@@ -44,4 +46,19 @@ export interface ChartConfig {
 export interface Point {
   time: number;
   price: number;
+}
+
+export interface MovingAverageConfig {
+  period: number;
+  color: string;
+  lineWidth: 1 | 2 | 3 | 4;
+  type: 'sma' | 'ema' | 'wma' | 'vwma';
+  priceSource: 'close' | 'open' | 'high' | 'low' | 'hl2' | 'hlc3' | 'ohlc4';
+  visible?: boolean;
+}
+
+export interface MovingAverageSeries {
+  id: string;
+  config: MovingAverageConfig;
+  data: { time: UTCTimestamp; value: number }[];
 }

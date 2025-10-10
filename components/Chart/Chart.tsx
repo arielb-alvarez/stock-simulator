@@ -1,8 +1,10 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { createChart, CrosshairMode, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { CandleStickData, ChartConfig, Drawing } from '../../types';
+import { MovingAverageConfig, MovingAverageService } from '../../services/MovingAverageService';
 import ChartContainer from './ChartContainer';
 import DrawingLayer from './DrawingLayer';
+import MovingAverageControls from './MovingAverageControls';
 
 interface ChartProps {
     data: CandleStickData[];
@@ -12,35 +14,45 @@ interface ChartProps {
     timeframe: string;
 }
 
-const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate, timeframe }) => {
+const Chart: React.FC<ChartProps> = ({ 
+    data, 
+    config, 
+    drawings, 
+    onDrawingsUpdate, 
+    timeframe
+}) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi>();
     const seriesRef = useRef<ISeriesApi<'Candlestick'>>();
+    const movingAverageSeriesRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
+    
     const [isChartReady, setIsChartReady] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [chartDimensions, setChartDimensions] = useState({ width: 0, height: 0 });
     const [viewportVersion, setViewportVersion] = useState(0);
+    
+    // Use global moving average configurations
+    const [movingAverageConfigs, setMovingAverageConfigs] = useState<MovingAverageConfig[]>(
+        MovingAverageService.getConfigs()
+    );
+
     const lastViewportState = useRef<string>('');
 
-    // Function to get current viewport state as a string for comparison
-    const getViewportState = useCallback(() => {
-        if (!chartRef.current) return '';
-        
-        const timeScale = chartRef.current.timeScale();
-        const visibleRange = timeScale.getVisibleLogicalRange();
-        const timeRange = timeScale.getVisibleRange(); // FIXED: getVisibleRange instead of getVisibleTimeRange
-        
-        return JSON.stringify({
-            from: visibleRange?.from,
-            to: visibleRange?.to,
-            timeFrom: timeRange?.from,
-            timeTo: timeRange?.to,
-            width: chartDimensions.width,
-            height: chartDimensions.height
+    // Subscribe to global configuration changes
+    useEffect(() => {
+        const unsubscribe = MovingAverageService.subscribeToConfigChanges((newConfigs) => {
+            setMovingAverageConfigs(newConfigs);
         });
-    }, [chartDimensions]);
+        
+        return unsubscribe;
+    }, []);
 
-    // Initialize chart and track dimensions
+    // Generate MA ID function
+    const generateMAId = useCallback((config: MovingAverageConfig): string => {
+        return `${config.type}-${config.period}-${config.priceSource}`;
+    }, []);
+
+    // Initialize chart
     useEffect(() => {
         if (!chartContainerRef.current) return;
 
@@ -68,7 +80,7 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
                 secondsVisible: false,
             },
             crosshair: {
-                mode: CrosshairMode.Normal, // Enable crosshair
+                mode: CrosshairMode.Normal,
             },
         } as any);
 
@@ -91,21 +103,18 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
             resizeObserver.observe(chartContainerRef.current);
         }
 
-        // Enhanced viewport change detection
         const handleViewportChange = () => {
             setViewportVersion(prev => prev + 1);
         };
 
-        // Subscribe to chart events
         const timeScale = chart.timeScale();
         timeScale.subscribeVisibleTimeRangeChange(handleViewportChange);
         timeScale.subscribeVisibleLogicalRangeChange(handleViewportChange);
         chart.subscribeCrosshairMove(handleViewportChange);
         chart.subscribeClick(handleViewportChange);
 
-        // Add wheel event for zooming
         const handleWheel = () => {
-            setTimeout(handleViewportChange, 100); // Delay to allow chart to update
+            setTimeout(handleViewportChange, 100);
         };
         
         if (chartContainerRef.current) {
@@ -123,6 +132,12 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
                 chartContainerRef.current.removeEventListener('wheel', handleWheel);
             }
             
+            // Clean up moving average series
+            movingAverageSeriesRef.current.forEach((series) => {
+                chart.removeSeries(series);
+            });
+            movingAverageSeriesRef.current.clear();
+            
             if (chart) {
                 chart.remove();
             }
@@ -130,7 +145,37 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
         };
     }, [config.theme]);
 
-    // Update chart data
+    // Update moving averages function
+    const updateMovingAverages = useCallback(() => {
+        if (!chartRef.current || !data.length) return;
+
+        // Remove all existing moving average series
+        movingAverageSeriesRef.current.forEach((series, id) => {
+            chartRef.current?.removeSeries(series);
+        });
+        movingAverageSeriesRef.current.clear();
+
+        // Calculate and add moving averages
+        movingAverageConfigs.forEach(config => {
+            if (!config.visible) return;
+
+            const maResult = MovingAverageService.calculateMovingAverage(data, config);
+            
+            if (maResult.data.length > 0) {
+                const maSeries = chartRef.current!.addLineSeries({
+                    color: config.color,
+                    lineWidth: config.lineWidth,
+                    title: `${config.type.toUpperCase()}(${config.period})`,
+                    priceScaleId: 'right',
+                });
+
+                maSeries.setData(maResult.data);
+                movingAverageSeriesRef.current.set(generateMAId(config), maSeries);
+            }
+        });
+    }, [data, movingAverageConfigs, generateMAId]);
+
+    // Update chart data and moving averages
     useEffect(() => {
         if (!seriesRef.current || !data.length) return;
 
@@ -144,13 +189,48 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
 
         seriesRef.current.setData(formattedData);
         
+        // Update moving averages
+        updateMovingAverages();
+        
         if (chartRef.current && formattedData.length > 0) {
             chartRef.current.timeScale().fitContent();
         }
         
-        // Force viewport update after data change
         setViewportVersion(prev => prev + 1);
-    }, [data, timeframe]);
+    }, [data, timeframe, updateMovingAverages]);
+
+    // Update moving averages when configs change
+    useEffect(() => {
+        if (isChartReady && data.length > 0) {
+            updateMovingAverages();
+        }
+    }, [movingAverageConfigs, isChartReady, data.length, updateMovingAverages]);
+
+    // Handle moving average configuration changes - now updates globally
+    const handleMovingAveragesUpdate = useCallback((newConfigs: MovingAverageConfig[]) => {
+        MovingAverageService.setConfigs(newConfigs);
+        // No need to call setMovingAverageConfigs here because we're subscribed to changes
+    }, []);
+
+    // Toggle moving average visibility globally
+    const toggleMovingAverageVisibility = useCallback((index: number) => {
+        const newConfigs = [...movingAverageConfigs];
+        newConfigs[index] = {
+            ...newConfigs[index],
+            visible: !newConfigs[index].visible
+        };
+        MovingAverageService.setConfigs(newConfigs);
+    }, [movingAverageConfigs]);
+
+    // Add new moving average globally
+    const addMovingAverage = useCallback((config: MovingAverageConfig) => {
+        MovingAverageService.addConfig({ ...config, visible: true });
+    }, []);
+
+    // Remove moving average globally
+    const removeMovingAverage = useCallback((index: number) => {
+        MovingAverageService.removeConfig(index);
+    }, []);
 
     // Check for mobile view
     useEffect(() => {
@@ -174,6 +254,17 @@ const Chart: React.FC<ChartProps> = ({ data, config, drawings, onDrawingsUpdate,
                     position: 'relative',
                     minHeight: '400px'
                 }} 
+            />
+            
+            {/* Moving Average Controls */}
+            <MovingAverageControls
+                configs={movingAverageConfigs}
+                onConfigsUpdate={handleMovingAveragesUpdate}
+                onToggleVisibility={toggleMovingAverageVisibility}
+                onAddMovingAverage={addMovingAverage}
+                onRemoveMovingAverage={removeMovingAverage}
+                theme={config.theme}
+                isMobile={isMobile}
             />
             
             {isChartReady && chartRef.current && seriesRef.current && (
