@@ -116,19 +116,20 @@ const useMockData = (symbol: string, timeframe: string) => {
           const newCandle = { time: now, open, high, low, close, volume };
           return [...prevData.slice(1), newCandle]; // Remove oldest, add newest
         } else {
-          // Update current candle
+          // Update current candle - safely access volume with fallback
           const volatility = 0.001; // 0.1% volatility for updates
           const changePercent = (Math.random() - 0.5) * volatility;
           const close = lastCandle.close * (1 + changePercent);
           const high = Math.max(lastCandle.high, close);
           const low = Math.min(lastCandle.low, close);
+          const currentVolume = lastCandle.volume ?? 100; // Fallback to 100 if undefined
           
           const updatedCandle = { 
             ...lastCandle, 
             high, 
             low, 
             close,
-            volume: lastCandle.volume + Math.random() * 10
+            volume: currentVolume + Math.random() * 10
           };
           
           return [...prevData.slice(0, -1), updatedCandle];
