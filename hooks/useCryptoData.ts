@@ -11,7 +11,7 @@ const useCryptoData = (symbol: string, timeframe: string) => {
     const fetchData = async () => {
       try {
         // Try CryptoCompare first (usually most accessible)
-        const cryptoCompareUrl = `https://min-api.cryptocompare.com/data/v2/histominute?fsym=BTC&tsym=USDT&limit=200&aggregate=${getCryptoCompareAggregate(timeframe)}`;
+        const cryptoCompareUrl = `https://min-api.cryptocompare.com/data/v2/histominute?fsym=BTC&tsym=USDT&limit=2000&aggregate=${getCryptoCompareAggregate(timeframe)}`;
         
         const response = await fetch(cryptoCompareUrl);
         if (response.ok) {

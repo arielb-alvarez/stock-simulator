@@ -32,20 +32,17 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
         <>
             <div style={{
                 position: 'absolute',
-                top: '10px',
-                right: '10px',
+                top: '5px',
+                left: '45px',
                 zIndex: 20,
-                background: theme === 'dark' ? 'rgba(42, 46, 57, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}`,
-                backdropFilter: 'blur(10px)',
+                padding: '5px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '4px',
-                minWidth: isMobile ? '140px' : '200px'
+                minWidth: isMobile ? '140px' : '200px',
+                background: "rgb(229 229 229 / 50%)"
             }}>
-                <div style={{
+                {/* <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
@@ -74,7 +71,7 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                     >
                         +
                     </button>
-                </div>
+                </div> */}
 
                 {configs.map((config, index) => (
                     <MovingAverageItem
@@ -126,7 +123,6 @@ const MovingAverageItem: React.FC<{
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '4px 0',
-            borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`
         }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div
@@ -151,7 +147,7 @@ const MovingAverageItem: React.FC<{
                     {config.type.toUpperCase()}({config.period})
                 </span>
             </div>
-            <button
+            {/* <button
                 onClick={() => onRemove(index)}
                 style={{
                     background: 'transparent',
@@ -164,7 +160,7 @@ const MovingAverageItem: React.FC<{
                 title="Remove"
             >
                 ×
-            </button>
+            </button> */}
         </div>
     );
 };

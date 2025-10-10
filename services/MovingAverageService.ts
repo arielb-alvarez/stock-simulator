@@ -114,28 +114,12 @@ class MovingAverageConfigManager {
     return [
       {
         period: 20,
-        color: '#FF6B6B',
+        color: '#3B82F6',
         lineWidth: 2,
         type: 'sma',
         priceSource: 'close',
         visible: true
       },
-      {
-        period: 50,
-        color: '#4ECDC4',
-        lineWidth: 2,
-        type: 'sma',
-        priceSource: 'close',
-        visible: true
-      },
-      {
-        period: 200,
-        color: '#45B7D1',
-        lineWidth: 2,
-        type: 'sma',
-        priceSource: 'close',
-        visible: true
-      }
     ];
   }
 }

@@ -149,15 +149,31 @@ const Chart: React.FC<ChartProps> = ({
     const updateMovingAverages = useCallback(() => {
         if (!chartRef.current || !data.length) return;
 
-        // Remove all existing moving average series
+        // Get current configs directly from the service to ensure we have the latest
+        const currentConfigs = MovingAverageService.getConfigs();
+        
+        // Remove only the series that are no longer needed
+        const currentMAIds = new Set(currentConfigs.map(generateMAId));
+        
+        // Remove series that are no longer in configs or are not visible
         movingAverageSeriesRef.current.forEach((series, id) => {
-            chartRef.current?.removeSeries(series);
+            const config = currentConfigs.find(cfg => generateMAId(cfg) === id);
+            if (!config || !config.visible) {
+                chartRef.current?.removeSeries(series);
+                movingAverageSeriesRef.current.delete(id);
+            }
         });
-        movingAverageSeriesRef.current.clear();
 
-        // Calculate and add moving averages
-        movingAverageConfigs.forEach(config => {
+        // Calculate and add/update moving averages
+        currentConfigs.forEach(config => {
             if (!config.visible) return;
+
+            const maId = generateMAId(config);
+            
+            // Skip if series already exists and is visible
+            if (movingAverageSeriesRef.current.has(maId)) {
+                return;
+            }
 
             const maResult = MovingAverageService.calculateMovingAverage(data, config);
             
@@ -170,10 +186,10 @@ const Chart: React.FC<ChartProps> = ({
                 });
 
                 maSeries.setData(maResult.data);
-                movingAverageSeriesRef.current.set(generateMAId(config), maSeries);
+                movingAverageSeriesRef.current.set(maId, maSeries);
             }
         });
-    }, [data, movingAverageConfigs, generateMAId]);
+    }, [data, generateMAId]);
 
     // Update chart data and moving averages
     useEffect(() => {
@@ -189,7 +205,7 @@ const Chart: React.FC<ChartProps> = ({
 
         seriesRef.current.setData(formattedData);
         
-        // Update moving averages
+        // Update moving averages - this will use the latest configs
         updateMovingAverages();
         
         if (chartRef.current && formattedData.length > 0) {
