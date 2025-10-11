@@ -405,6 +405,54 @@ export class MovingAverageService {
     const minPoints = this.getMinDataPointsRequired(configs);
     return data.length >= minPoints;
   }
+
+  static calculateRealTimeMA(
+    historicalData: CandleStickData[],
+    newPoint: CandleStickData,
+    config: MovingAverageConfig
+    ): MovingAverageData | null {
+        if (historicalData.length < config.period - 1) return null;
+
+        // Combine historical data with new point
+        const combinedData = [...historicalData.slice(-config.period + 1), newPoint];
+        
+        if (combinedData.length < config.period) return null;
+
+        switch (config.type) {
+            case 'sma':
+                return this.calculateSMA(combinedData, config.period, config.priceSource)[0] || null;
+            case 'ema':
+                return this.calculateEMA(combinedData, config.period, config.priceSource)[0] || null;
+            case 'wma':
+                return this.calculateWMA(combinedData, config.period, config.priceSource)[0] || null;
+            case 'vwma':
+                return this.calculateVWMA(combinedData, config.period, config.priceSource)[0] || null;
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Calculate EMA incrementally (for better real-time performance)
+     */
+    static calculateEMAIncremental(
+        previousEMA: number,
+        newPrice: number,
+        period: number
+    ): number {
+        const multiplier = 2 / (period + 1);
+        return (newPrice - previousEMA) * multiplier + previousEMA;
+    }
+
+    /**
+     * Get the minimum data required for real-time MA calculation
+     */
+    static getRequiredDataForRealTime(
+        historicalData: CandleStickData[],
+        period: number
+    ): CandleStickData[] {
+        return historicalData.slice(-period + 1);
+    }
 }
 
 export default MovingAverageService;
