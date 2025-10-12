@@ -10,12 +10,26 @@ const useCryptoData = (symbol: string, timeframe: string) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Try CryptoCompare first (usually most accessible)
+        // Try Binance first (most reliable for crypto data)
+        const binanceUrl = `https://api.binance.com/api/v3/klines?symbol=${symbol.toUpperCase()}&interval=${getBinanceInterval(timeframe)}&limit=1000`;
+        
+        const binanceResponse = await fetch(binanceUrl);
+        if (binanceResponse.ok) {
+          const result = await binanceResponse.json();
+          const parsedData = parseBinanceData(result);
+          setCandleData(parsedData);
+          setDataSource('Binance');
+          setError(null);
+          setIsConnected(true);
+          return;
+        }
+        
+        // If Binance fails, try CryptoCompare
         const cryptoCompareUrl = `https://min-api.cryptocompare.com/data/v2/histominute?fsym=BTC&tsym=USDT&limit=2000&aggregate=${getCryptoCompareAggregate(timeframe)}`;
         
-        const response = await fetch(cryptoCompareUrl);
-        if (response.ok) {
-          const result = await response.json();
+        const cryptoCompareResponse = await fetch(cryptoCompareUrl);
+        if (cryptoCompareResponse.ok) {
+          const result = await cryptoCompareResponse.json();
           const parsedData = parseCryptoCompareData(result);
           setCandleData(parsedData);
           setDataSource('CryptoCompare');
@@ -37,8 +51,8 @@ const useCryptoData = (symbol: string, timeframe: string) => {
           return;
         }
         
-        // If both fail, use mock data
-        throw new Error('Both APIs failed');
+        // If all APIs fail, use mock data
+        throw new Error('All APIs failed');
         
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -51,14 +65,40 @@ const useCryptoData = (symbol: string, timeframe: string) => {
 
     fetchData();
     
-    const interval = setInterval(fetchData, 300000);
+    const interval = setInterval(fetchData, 300000); // 5 minutes
     return () => clearInterval(interval);
   }, [symbol, timeframe]);
 
   return { candleData, isConnected, error, dataSource };
 };
 
-// Helper functions for different exchanges
+// ==================== BINANCE HELPERS ====================
+
+const getBinanceInterval = (timeframe: string): string => {
+  const mapping: {[key: string]: string} = {
+    '1m': '1m',
+    '5m': '5m', 
+    '15m': '15m',
+    '1h': '1h',
+    '4h': '4h',
+    '1d': '1d'
+  };
+  return mapping[timeframe] || '5m';
+};
+
+const parseBinanceData = (data: any[]): CandleStickData[] => {
+  return data.map((candle: any[]) => ({
+    time: candle[0], // Open time (already in milliseconds)
+    open: parseFloat(candle[1]),
+    high: parseFloat(candle[2]),
+    low: parseFloat(candle[3]),
+    close: parseFloat(candle[4]),
+    volume: parseFloat(candle[5])
+  }));
+};
+
+// ==================== EXISTING HELPERS ====================
+
 const getCryptoCompareAggregate = (timeframe: string): number => {
   const mapping: {[key: string]: number} = {
     '1m': 1, '5m': 5, '15m': 15, 
@@ -79,7 +119,6 @@ const parseCryptoCompareData = (data: any): CandleStickData[] => {
   }));
 };
 
-// Helper functions for Gemini API
 const getGeminiTimeframe = (timeframe: string): string => {
   const mapping: {[key: string]: string} = {
     '1m': '1m', '5m': '5m', '15m': '15m', 
