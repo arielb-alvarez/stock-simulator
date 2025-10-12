@@ -1,5 +1,5 @@
 // components/MovingAverageConfigDialog.tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react'; // NEW: Added useEffect
 import { MovingAverageConfig } from '../../types';
 import { MovingAverageService } from '../../services/MovingAverageService';
 
@@ -8,35 +8,49 @@ interface MovingAverageConfigDialogProps {
     onClose: () => void;
     theme: 'light' | 'dark';
     isMobile: boolean;
+    config?: MovingAverageConfig; // NEW: Optional existing config for editing
+    isEditing?: boolean; // NEW: Flag to indicate edit mode
 }
 
 const MovingAverageConfigDialog: React.FC<MovingAverageConfigDialogProps> = ({
     onSave,
     onClose,
     theme,
-    isMobile
+    isMobile,
+    config, // NEW: Existing config for editing
+    isEditing = false // NEW: Default to false for backward compatibility
 }) => {
-    const [config, setConfig] = useState<MovingAverageConfig>({
-        period: 20,
-        color: '#3B82F6',
-        lineWidth: 1, // Only 1, 2, 3, or 4
-        type: 'sma',
-        priceSource: 'close'
-    });
+    // NEW: Initialize with existing config or defaults
+    const [currentConfig, setCurrentConfig] = useState<MovingAverageConfig>(
+        config || {
+            period: 20,
+            color: '#3B82F6',
+            lineWidth: 1,
+            type: 'sma',
+            priceSource: 'close'
+        }
+    );
 
     const [errors, setErrors] = useState<string[]>([]);
 
+    // NEW: Update config when prop changes (for editing)
+    useEffect(() => {
+        if (config) {
+            setCurrentConfig(config);
+        }
+    }, [config]);
+
     const handleSave = useCallback(() => {
-        const validation = MovingAverageService.validateConfig(config);
+        const validation = MovingAverageService.validateConfig(currentConfig);
         if (validation.isValid) {
-            onSave(config);
+            onSave(currentConfig);
         } else {
             setErrors(validation.errors);
         }
-    }, [config, onSave]);
+    }, [currentConfig, onSave]);
 
     const handleChange = useCallback((field: keyof MovingAverageConfig, value: any) => {
-        setConfig(prev => ({ ...prev, [field]: value }));
+        setCurrentConfig(prev => ({ ...prev, [field]: value }));
         setErrors([]);
     }, []);
 
@@ -45,7 +59,6 @@ const MovingAverageConfigDialog: React.FC<MovingAverageConfigDialogProps> = ({
         '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'
     ];
 
-    // FIX: Only allow valid line widths
     const validLineWidths = [1, 2, 3, 4] as const;
 
     return (
@@ -69,11 +82,12 @@ const MovingAverageConfigDialog: React.FC<MovingAverageConfigDialogProps> = ({
                 maxWidth: '90vw',
                 boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)'
             }} onClick={e => e.stopPropagation()}>
+                {/* NEW: Dynamic title based on mode */}
                 <h3 style={{
                     margin: '0 0 20px 0',
                     color: theme === 'dark' ? '#fff' : '#000'
                 }}>
-                    Add Moving Average
+                    {isEditing ? 'Edit Moving Average' : 'Add Moving Average'}
                 </h3>
 
                 {errors.length > 0 && (
@@ -105,7 +119,7 @@ const MovingAverageConfigDialog: React.FC<MovingAverageConfigDialogProps> = ({
                             Type
                         </label>
                         <select
-                            value={config.type}
+                            value={currentConfig.type}
                             onChange={(e) => handleChange('type', e.target.value)}
                             style={{
                                 width: '100%',
@@ -138,7 +152,7 @@ const MovingAverageConfigDialog: React.FC<MovingAverageConfigDialogProps> = ({
                             type="number"
                             min="2"
                             max="500"
-                            value={config.period}
+                            value={currentConfig.period}
                             onChange={(e) => handleChange('period', parseInt(e.target.value) || 2)}
                             style={{
                                 width: '100%',
@@ -163,7 +177,7 @@ const MovingAverageConfigDialog: React.FC<MovingAverageConfigDialogProps> = ({
                             Price Source
                         </label>
                         <select
-                            value={config.priceSource}
+                            value={currentConfig.priceSource}
                             onChange={(e) => handleChange('priceSource', e.target.value)}
                             style={{
                                 width: '100%',
@@ -205,7 +219,7 @@ const MovingAverageConfigDialog: React.FC<MovingAverageConfigDialogProps> = ({
                                         borderRadius: '50%',
                                         background: color,
                                         cursor: 'pointer',
-                                        border: config.color === color ? 
+                                        border: currentConfig.color === color ? 
                                             `2px solid ${theme === 'dark' ? '#fff' : '#000'}` : 
                                             '2px solid transparent'
                                     }}
@@ -215,7 +229,7 @@ const MovingAverageConfigDialog: React.FC<MovingAverageConfigDialogProps> = ({
                         </div>
                         <input
                             type="color"
-                            value={config.color}
+                            value={currentConfig.color}
                             onChange={(e) => handleChange('color', e.target.value)}
                             style={{
                                 marginTop: '8px',
@@ -227,7 +241,7 @@ const MovingAverageConfigDialog: React.FC<MovingAverageConfigDialogProps> = ({
                         />
                     </div>
 
-                    {/* Line Width - FIXED: Only allow 1, 2, 3, 4 */}
+                    {/* Line Width */}
                     <div>
                         <label style={{
                             display: 'block',
@@ -248,14 +262,14 @@ const MovingAverageConfigDialog: React.FC<MovingAverageConfigDialogProps> = ({
                                         flex: 1,
                                         padding: '8px',
                                         border: `1px solid ${
-                                            config.lineWidth === width 
+                                            currentConfig.lineWidth === width 
                                                 ? '#3B82F6' 
                                                 : (theme === 'dark' ? '#374151' : '#D1D5DB')
                                         }`,
-                                        background: config.lineWidth === width 
+                                        background: currentConfig.lineWidth === width 
                                             ? '#3B82F6' 
                                             : (theme === 'dark' ? '#374151' : '#FFFFFF'),
-                                        color: config.lineWidth === width ? 'white' : (theme === 'dark' ? '#fff' : '#000'),
+                                        color: currentConfig.lineWidth === width ? 'white' : (theme === 'dark' ? '#fff' : '#000'),
                                         borderRadius: '4px',
                                         cursor: 'pointer'
                                     }}
@@ -286,6 +300,7 @@ const MovingAverageConfigDialog: React.FC<MovingAverageConfigDialogProps> = ({
                     >
                         Cancel
                     </button>
+                    {/* NEW: Dynamic button text based on mode */}
                     <button
                         onClick={handleSave}
                         style={{
@@ -297,7 +312,7 @@ const MovingAverageConfigDialog: React.FC<MovingAverageConfigDialogProps> = ({
                             cursor: 'pointer'
                         }}
                     >
-                        Add Moving Average
+                        {isEditing ? 'Update Moving Average' : 'Add Moving Average'}
                     </button>
                 </div>
             </div>

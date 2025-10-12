@@ -49,7 +49,8 @@ const Chart: React.FC<ChartProps> = ({
     // Subscribe to global configuration changes
     useEffect(() => {
         const unsubscribe = MovingAverageService.subscribeToConfigChanges((newConfigs) => {
-            setMovingAverageConfigs(newConfigs);
+            console.log('Config changed, updating state:', newConfigs.length);
+            setMovingAverageConfigs([...newConfigs]);
         });
         
         return unsubscribe;
@@ -180,13 +181,12 @@ const Chart: React.FC<ChartProps> = ({
         // Get current configs directly from the service to ensure we have the latest
         const currentConfigs = MovingAverageService.getConfigs();
         
-        // Remove only the series that are no longer needed
+        // Remove only the series that are no longer needed or have changed significantly
         const currentMAIds = new Set(currentConfigs.map(generateMAId));
         
-        // Remove series that are no longer in configs or are not visible
+        // Remove series that are no longer in configs
         movingAverageSeriesRef.current.forEach((series, id) => {
-            const config = currentConfigs.find(cfg => generateMAId(cfg) === id);
-            if (!config || !config.visible) {
+            if (!currentMAIds.has(id)) {
                 chartRef.current?.removeSeries(series);
                 movingAverageSeriesRef.current.delete(id);
             }
@@ -194,7 +194,16 @@ const Chart: React.FC<ChartProps> = ({
 
         // Calculate and add/update moving averages
         currentConfigs.forEach(config => {
-            if (!config.visible) return;
+            if (!config.visible) {
+                // Remove if exists but not visible
+                const maId = generateMAId(config);
+                const existingSeries = movingAverageSeriesRef.current.get(maId);
+                if (existingSeries) {
+                    chartRef.current?.removeSeries(existingSeries);
+                    movingAverageSeriesRef.current.delete(maId);
+                }
+                return;
+            }
 
             const maId = generateMAId(config);
             const existingSeries = movingAverageSeriesRef.current.get(maId);
@@ -209,12 +218,17 @@ const Chart: React.FC<ChartProps> = ({
                     });
                 }
             } else {
-                // Full recalculation for new series or non-real-time updates
+                // Full recalculation for new series, edits, or non-real-time updates
                 const maResult = MovingAverageService.calculateMovingAverage(data, config);
                 
                 if (maResult.data.length > 0) {
                     if (existingSeries) {
-                        // Update existing series with full data
+                        // Update existing series with full data and new style
+                        existingSeries.applyOptions({
+                            color: config.color,
+                            lineWidth: config.lineWidth,
+                            title: `${config.type.toUpperCase()}(${config.period})`,
+                        });
                         existingSeries.setData(maResult.data);
                     } else {
                         // Create new series
@@ -341,6 +355,16 @@ const Chart: React.FC<ChartProps> = ({
         MovingAverageService.removeConfig(index);
     }, []);
 
+    const updateMovingAverage = useCallback((index: number, config: MovingAverageConfig) => {
+        MovingAverageService.updateConfig(index, config);
+    }, []);
+
+    useEffect(() => {
+        if (isChartReady && data.length > 0) {
+            updateMovingAverages(false);
+        }
+    }, [movingAverageConfigs, isChartReady, data.length, updateMovingAverages]);
+
     // Check for mobile view
     useEffect(() => {
         const checkMobile = () => {
@@ -371,6 +395,7 @@ const Chart: React.FC<ChartProps> = ({
                 onConfigsUpdate={handleMovingAveragesUpdate}
                 onToggleVisibility={toggleMovingAverageVisibility}
                 onAddMovingAverage={addMovingAverage}
+                onUpdateMovingAverage={updateMovingAverage}
                 onRemoveMovingAverage={removeMovingAverage}
                 theme={config.theme}
                 isMobile={isMobile}
