@@ -17,13 +17,11 @@ interface MovingAverageControlsProps {
 const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
     configs,
     onToggleVisibility,
-    onAddMovingAverage,
     onUpdateMovingAverage,
     onRemoveMovingAverage,
     theme,
     isMobile
 }) => {
-    const [showConfigDialog, setShowConfigDialog] = useState(false);
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [isClient, setIsClient] = useState(false);
 
@@ -31,11 +29,6 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
     useEffect(() => {
         setIsClient(true);
     }, []);
-
-    const handleAddMovingAverage = useCallback((config: MovingAverageConfig) => {
-        onAddMovingAverage(config);
-        setShowConfigDialog(false);
-    }, [onAddMovingAverage]);
 
     const handleUpdateMovingAverage = useCallback((config: MovingAverageConfig) => {
         if (editingIndex !== null) {
@@ -67,46 +60,7 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '4px',
-                background: theme === 'dark' ? "rgb(30 41 59 / 80%)" : "rgb(255 255 255 / 80%)",
-                borderRadius: "5px",
-                backdropFilter: 'blur(4px)',
-                border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
-                padding: '4px',
-                minWidth: '200px'
             }}>
-                {/* Add new MA button */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '4px 8px',
-                    borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
-                    marginBottom: '4px'
-                }}>
-                    <span style={{
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        color: theme === 'dark' ? '#fff' : '#000'
-                    }}>
-                        Moving Averages
-                    </span>
-                    <button
-                        onClick={() => setShowConfigDialog(true)}
-                        style={{
-                            background: '#3B82F6',
-                            border: 'none',
-                            color: 'white',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            padding: '4px 8px',
-                            borderRadius: '3px'
-                        }}
-                        title="Add new moving average"
-                    >
-                        +
-                    </button>
-                </div>
-
                 {configs.length > 0 ? (
                     configs.map((config, index) => (
                         <MovingAverageItem
@@ -131,16 +85,6 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                     </div>
                 )}
             </div>
-
-            {/* Add new MA dialog */}
-            {showConfigDialog && (
-                <MovingAverageConfigDialog
-                    onSave={handleAddMovingAverage}
-                    onClose={() => setShowConfigDialog(false)}
-                    theme={theme}
-                    isMobile={isMobile}
-                />
-            )}
 
             {/* Edit existing MA dialog */}
             {editingIndex !== null && (
@@ -170,7 +114,6 @@ const MovingAverageItem: React.FC<{
         <div style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
             padding: '4px 8px',
             borderRadius: '3px',
             background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
@@ -180,9 +123,23 @@ const MovingAverageItem: React.FC<{
                 display: 'flex', 
                 alignItems: 'center', 
                 gap: '8px',
-                flex: 1,
                 minWidth: 0 // Allow text truncation
             }}>
+                {/* MA Label - Moved to the beginning */}
+                <span style={{
+                    fontSize: '11px',
+                    color: theme === 'dark' ? 
+                        (config.visible ? '#fff' : 'rgba(255,255,255,0.4)') : 
+                        (config.visible ? '#000' : 'rgba(0,0,0,0.4)'),
+                    textDecoration: config.visible ? 'none' : 'line-through',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    flex: 1
+                }}>
+                    {config.type.toUpperCase()}({config.period})
+                </span>
+
                 {/* Visibility Toggle Circle */}
                 <div
                     style={{
@@ -197,21 +154,6 @@ const MovingAverageItem: React.FC<{
                     onClick={() => onToggleVisibility(index)}
                     title={config.visible ? 'Hide' : 'Show'}
                 />
-
-                {/* MA Label */}
-                <span style={{
-                    fontSize: '11px',
-                    color: theme === 'dark' ? 
-                        (config.visible ? '#fff' : 'rgba(255,255,255,0.4)') : 
-                        (config.visible ? '#000' : 'rgba(0,0,0,0.4)'),
-                    textDecoration: config.visible ? 'none' : 'line-through',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    flex: 1
-                }}>
-                    {config.type.toUpperCase()}({config.period})
-                </span>
 
                 {/* Edit Button (Gear Icon) */}
                 <button
