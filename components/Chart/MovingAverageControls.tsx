@@ -41,7 +41,7 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                 background: "rgb(255 255 255 / 80%)",
                 borderRadius: "5px",
             }}>
-                {configs.map((config, index) => (
+                {configs.length > 0 && configs.map((config, index) => (
                     <MovingAverageItem
                         key={index}
                         config={config}
@@ -52,17 +52,6 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                         isMobile={isMobile}
                     />
                 ))}
-
-                {configs.length === 0 && (
-                    <div style={{
-                        fontSize: '11px',
-                        color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)',
-                        textAlign: 'center',
-                        padding: '8px 0'
-                    }}>
-                        No moving averages
-                    </div>
-                )}
             </div>
 
             {showConfigDialog && (
