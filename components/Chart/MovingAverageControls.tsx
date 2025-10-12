@@ -35,12 +35,11 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                 top: '5px',
                 left: '45px',
                 zIndex: 20,
-                padding: '5px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '4px',
-                minWidth: isMobile ? '140px' : '200px',
-                background: "rgb(229 229 229 / 50%)"
+                background: "rgb(229 229 229 / 50%)",
+                borderRadius: "5px",
             }}>
                 {configs.map((config, index) => (
                     <MovingAverageItem
@@ -56,7 +55,7 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
 
                 {configs.length === 0 && (
                     <div style={{
-                        fontSize: '12px',
+                        fontSize: '11px',
                         color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)',
                         textAlign: 'center',
                         padding: '8px 0'
@@ -91,9 +90,19 @@ const MovingAverageItem: React.FC<{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '4px 0',
+            padding: '4px',
         }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                    fontSize: '11px',
+                    color: theme === 'dark' ? 
+                        (config.visible ? '#fff' : 'rgba(255,255,255,0.4)') : 
+                        (config.visible ? '#000' : 'rgba(0,0,0,0.4)'),
+                    textDecoration: config.visible ? 'none' : 'line-through'
+                }}>
+                    {config.type.toUpperCase()}({config.period})
+                </span>
+
                 <div
                     style={{
                         width: '12px',
@@ -106,17 +115,8 @@ const MovingAverageItem: React.FC<{
                     onClick={() => onToggleVisibility(index)}
                     title={config.visible ? 'Hide' : 'Show'}
                 />
-                <span style={{
-                    fontSize: isMobile ? '11px' : '12px',
-                    color: theme === 'dark' ? 
-                        (config.visible ? '#fff' : 'rgba(255,255,255,0.4)') : 
-                        (config.visible ? '#000' : 'rgba(0,0,0,0.4)'),
-                    textDecoration: config.visible ? 'none' : 'line-through'
-                }}>
-                    {config.type.toUpperCase()}({config.period})
-                </span>
             </div>
-            {/* <button
+            <button
                 onClick={() => onRemove(index)}
                 style={{
                     background: 'transparent',
@@ -129,7 +129,7 @@ const MovingAverageItem: React.FC<{
                 title="Remove"
             >
                 ×
-            </button> */}
+            </button>
         </div>
     );
 };
