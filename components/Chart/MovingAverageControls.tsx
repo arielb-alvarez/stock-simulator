@@ -116,7 +116,7 @@ const MovingAverageItem: React.FC<{
             alignItems: 'center',
             padding: '4px 8px',
             borderRadius: '3px',
-            background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+            background: 'rgba(255, 255, 255, 0.5)',
             marginBottom: '2px'
         }}>
             <div style={{ 
@@ -128,9 +128,7 @@ const MovingAverageItem: React.FC<{
                 {/* MA Label - Moved to the beginning */}
                 <span style={{
                     fontSize: '11px',
-                    color: theme === 'dark' ? 
-                        (config.visible ? '#fff' : 'rgba(255,255,255,0.4)') : 
-                        (config.visible ? '#000' : 'rgba(0,0,0,0.4)'),
+                    color: 'rgba(0,0,0,0.6)',
                     textDecoration: config.visible ? 'none' : 'line-through',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -161,7 +159,7 @@ const MovingAverageItem: React.FC<{
                     style={{
                         background: 'transparent',
                         border: 'none',
-                        color: theme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)',
+                        color: 'rgba(0,0,0,0.6)',
                         cursor: 'pointer',
                         fontSize: '12px',
                         padding: '2px',
@@ -195,7 +193,7 @@ const MovingAverageItem: React.FC<{
                 style={{
                     background: 'transparent',
                     border: 'none',
-                    color: theme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)',
+                    color: 'rgba(0,0,0,0.6)',
                     cursor: 'pointer',
                     fontSize: '16px',
                     padding: '0 4px',
