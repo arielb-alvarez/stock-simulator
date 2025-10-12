@@ -61,29 +61,18 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                 flexDirection: 'column',
                 gap: '4px',
             }}>
-                {configs.length > 0 ? (
-                    configs.map((config, index) => (
-                        <MovingAverageItem
-                            key={index}
-                            config={config}
-                            index={index}
-                            onToggleVisibility={onToggleVisibility}
-                            onEdit={handleEditClick}
-                            onRemove={onRemoveMovingAverage}
-                            theme={theme}
-                            isMobile={isMobile}
-                        />
-                    ))
-                ) : (
-                    <div style={{
-                        padding: '8px',
-                        textAlign: 'center',
-                        color: theme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)',
-                        fontSize: '11px'
-                    }}>
-                        No moving averages
-                    </div>
-                )}
+                {configs.length > 0 && configs.map((config, index) => (
+                    <MovingAverageItem
+                        key={index}
+                        config={config}
+                        index={index}
+                        onToggleVisibility={onToggleVisibility}
+                        onEdit={handleEditClick}
+                        onRemove={onRemoveMovingAverage}
+                        theme={theme}
+                        isMobile={isMobile}
+                    />
+                ))}
             </div>
 
             {/* Edit existing MA dialog */}
