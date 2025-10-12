@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { ChartConfig } from '../../types';
-import { SunIcon, MoonIcon, ClearIcon } from './../DrawingTools/Icons';
+import React, { useCallback, useState } from 'react';
+import { ChartConfig, MovingAverageConfig } from '../../types';
+import { SunIcon, MoonIcon, ClearIcon, IndicatorIcon } from './../DrawingTools/Icons';
 import ConnectionStatus from './ConnectionStatus';
+import MovingAverageConfigDialog from './../Chart/MovingAverageConfigDialog';
+import MovingAverageService from '@/services/MovingAverageService';
 
 interface HeaderProps {
   timeframe: string;
@@ -10,6 +12,7 @@ interface HeaderProps {
   onConfigChange: (config: ChartConfig) => void;
   isConnected: boolean;
   onClearDrawings: () => void;
+  onAddMovingAverage: (config: MovingAverageConfig) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -19,15 +22,36 @@ const Header: React.FC<HeaderProps> = ({
   onConfigChange,
   isConnected,
   onClearDrawings,
+  onAddMovingAverage,
 }) => {
   const [showTimeframes, setShowTimeframes] = useState(false);
+  const [showIndicators, setShowIndicators] = useState(false);
+  const [showMADialog, setShowMADialog] = useState(false);
 
   const availableTimeframes = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'];
+  
+  // Available indicators
+  const availableIndicators = [
+    'Moving Average',
+  ];
 
   const handleTimeframeSelect = (tf: string) => {
     onTimeframeChange(tf);
     setShowTimeframes(false);
   };
+
+  const handleIndicatorSelect = (indicator: string) => {
+    if (indicator === 'Moving Average') {
+      setShowMADialog(true);
+    }
+    setShowIndicators(false);
+  };
+
+  // Add new moving average globally
+  const addMovingAverage = useCallback((config: MovingAverageConfig) => {
+      MovingAverageService.addConfig({ ...config, visible: true });
+      setShowMADialog(false);
+  }, []);
 
   return (
     <header className="main-header">
@@ -60,6 +84,32 @@ const Header: React.FC<HeaderProps> = ({
               </div>
             )}
           </div>
+
+          {/* Indicators Dropdown Button */}
+          <div className="indicators-dropdown">
+            <button 
+              className={`indicators-btn ${config.theme}`}
+              onClick={() => setShowIndicators(!showIndicators)}
+              title="Add Indicators"
+            >
+              <IndicatorIcon />
+              Indicators
+            </button>
+            
+            {showIndicators && (
+              <div className={`indicators-menu ${config.theme}`}>
+                {availableIndicators.map((indicator) => (
+                  <button
+                    key={indicator}
+                    className="indicator-option"
+                    onClick={() => handleIndicatorSelect(indicator)}
+                  >
+                    {indicator}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -74,6 +124,16 @@ const Header: React.FC<HeaderProps> = ({
         
         <ThemeSelector config={config} onConfigChange={onConfigChange} />
       </div>
+
+      {/* Moving Average Configuration Dialog */}
+      {showMADialog && (
+        <MovingAverageConfigDialog
+          onSave={addMovingAverage}
+          onClose={() => setShowMADialog(false)}
+          theme={config.theme}
+          isMobile={false} // You might want to make this dynamic based on screen size
+        />
+      )}
 
       <style jsx>{`
         .main-header {
@@ -102,12 +162,14 @@ const Header: React.FC<HeaderProps> = ({
           gap: 12px;
         }
 
-        .timeframe-dropdown {
+        .timeframe-dropdown,
+        .indicators-dropdown {
           position: relative;
           display: inline-block;
         }
 
-        .timeframe-btn {
+        .timeframe-btn,
+        .indicators-btn {
           display: flex;
           align-items: center;
           gap: 6px;
@@ -120,32 +182,27 @@ const Header: React.FC<HeaderProps> = ({
           transition: all 0.2s ease;
         }
 
-        .timeframe-btn.light {
+        .timeframe-btn.light,
+        .indicators-btn.light {
           background-color: #f8f9fa;
           border-color: #dee2e6;
           color: #495057;
         }
 
-        .timeframe-btn.dark {
+        .timeframe-btn.dark,
+        .indicators-btn.dark {
           background-color: #2a2e39;
           border-color: #40444f;
           color: #e0e0e0;
         }
 
-        .timeframe-btn:hover {
+        .timeframe-btn:hover,
+        .indicators-btn:hover {
           opacity: 0.8;
         }
 
-        .dropdown-arrow {
-          font-size: 0.7rem;
-          transition: transform 0.2s ease;
-        }
-
-        .dropdown-arrow.open {
-          transform: rotate(180deg);
-        }
-
-        .timeframe-menu {
+        .timeframe-menu,
+        .indicators-menu {
           position: absolute;
           top: 100%;
           left: 0;
@@ -153,21 +210,33 @@ const Header: React.FC<HeaderProps> = ({
           border: 1px solid;
           border-radius: 4px;
           z-index: 1000;
-          min-width: 55px;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         }
 
-        .timeframe-menu.light {
+        .timeframe-menu {
+          min-width: 55px;
+        }
+
+        .indicators-menu {
+          min-width: 180px;
+          max-height: 300px;
+          overflow-y: auto;
+        }
+
+        .timeframe-menu.light,
+        .indicators-menu.light {
           background-color: #ffffff;
           border-color: #dee2e6;
         }
 
-        .timeframe-menu.dark {
+        .timeframe-menu.dark,
+        .indicators-menu.dark {
           background-color: #2a2e39;
           border-color: #40444f;
         }
 
-        .timeframe-option {
+        .timeframe-option,
+        .indicator-option {
           display: block;
           width: 100%;
           padding: 8px 12px;
@@ -179,21 +248,25 @@ const Header: React.FC<HeaderProps> = ({
           transition: background-color 0.2s ease;
         }
 
-        .timeframe-option.light {
+        .timeframe-option.light,
+        .indicator-option.light {
           color: #495057;
         }
 
         .timeframe-option.light:hover,
-        .timeframe-option.light.active {
+        .timeframe-option.light.active,
+        .indicator-option.light:hover {
           background-color: #e9ecef;
         }
 
-        .timeframe-option.dark {
+        .timeframe-option.dark,
+        .indicator-option.dark {
           color: #e0e0e0;
         }
 
         .timeframe-option.dark:hover,
-        .timeframe-option.dark.active {
+        .timeframe-option.dark.active,
+        .indicator-option.dark:hover {
           background-color: #40444f;
         }
 
@@ -263,6 +336,14 @@ const Header: React.FC<HeaderProps> = ({
           
           .status-controls {
             gap: 8px;
+          }
+
+          .indicators-btn span {
+            display: none;
+          }
+
+          .indicators-btn {
+            padding: 6px;
           }
         }
       `}</style>

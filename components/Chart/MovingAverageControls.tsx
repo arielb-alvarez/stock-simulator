@@ -42,37 +42,6 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                 minWidth: isMobile ? '140px' : '200px',
                 background: "rgb(229 229 229 / 50%)"
             }}>
-                {/* <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '4px',
-                    paddingBottom: '4px',
-                    borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`
-                }}>
-                    <span style={{
-                        fontSize: isMobile ? '12px' : '14px',
-                        fontWeight: 'bold',
-                        color: theme === 'dark' ? '#fff' : '#000'
-                    }}>
-                        Moving Averages
-                    </span>
-                    <button
-                        onClick={() => setShowConfigDialog(true)}
-                        style={{
-                            background: theme === 'dark' ? '#3B82F6' : '#2563EB',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            padding: '2px 8px',
-                            fontSize: '12px',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        +
-                    </button>
-                </div> */}
-
                 {configs.map((config, index) => (
                     <MovingAverageItem
                         key={index}
