@@ -57,3 +57,50 @@ export const ClearIcon = ({ color = 'currentColor', size = 14 }) => (
     <line x1="14" y1="11" x2="14" y2="17"/>
   </svg>
 );
+
+export const IndicatorIcon = ({ color = 'currentColor', size = 16 }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    {/* Main chart line */}
+    <path 
+      d="M3 17L7 13L10 16L14 11L17 14L21 10" 
+      stroke={color} 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    />
+    
+    {/* Moving Average line 1 - dashed */}
+    <path 
+      d="M3 14L7 10L10 13L14 8L17 11L21 7" 
+      stroke={color} 
+      strokeWidth="1.5" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+      strokeDasharray="2 2"
+      opacity="0.8"
+    />
+    
+    {/* Moving Average line 2 - dotted */}
+    <path 
+      d="M3 20L7 16L10 19L14 14L17 17L21 13" 
+      stroke={color} 
+      strokeWidth="1.5" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+      strokeDasharray="1 1"
+      opacity="0.6"
+    />
+    
+    {/* Data points/circles */}
+    <circle cx="7" cy="13" r="1" fill={color} />
+    <circle cx="10" cy="16" r="1" fill={color} />
+    <circle cx="14" cy="11" r="1" fill={color} />
+    <circle cx="17" cy="14" r="1" fill={color} />
+  </svg>
+);

@@ -35,45 +35,13 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                 top: '5px',
                 left: '45px',
                 zIndex: 20,
-                padding: '5px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '4px',
-                minWidth: isMobile ? '140px' : '200px',
-                background: "rgb(229 229 229 / 50%)"
+                background: "rgb(255 255 255 / 80%)",
+                borderRadius: "5px",
             }}>
-                {/* <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '4px',
-                    paddingBottom: '4px',
-                    borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`
-                }}>
-                    <span style={{
-                        fontSize: isMobile ? '12px' : '14px',
-                        fontWeight: 'bold',
-                        color: theme === 'dark' ? '#fff' : '#000'
-                    }}>
-                        Moving Averages
-                    </span>
-                    <button
-                        onClick={() => setShowConfigDialog(true)}
-                        style={{
-                            background: theme === 'dark' ? '#3B82F6' : '#2563EB',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            padding: '2px 8px',
-                            fontSize: '12px',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        +
-                    </button>
-                </div> */}
-
-                {configs.map((config, index) => (
+                {configs.length > 0 && configs.map((config, index) => (
                     <MovingAverageItem
                         key={index}
                         config={config}
@@ -84,17 +52,6 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                         isMobile={isMobile}
                     />
                 ))}
-
-                {configs.length === 0 && (
-                    <div style={{
-                        fontSize: '12px',
-                        color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)',
-                        textAlign: 'center',
-                        padding: '8px 0'
-                    }}>
-                        No moving averages
-                    </div>
-                )}
             </div>
 
             {showConfigDialog && (
@@ -122,9 +79,19 @@ const MovingAverageItem: React.FC<{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '4px 0',
+            padding: '4px',
         }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                    fontSize: '11px',
+                    color: theme === 'dark' ? 
+                        (config.visible ? '#fff' : 'rgba(255,255,255,0.4)') : 
+                        (config.visible ? '#000' : 'rgba(0,0,0,0.4)'),
+                    textDecoration: config.visible ? 'none' : 'line-through'
+                }}>
+                    {config.type.toUpperCase()}({config.period})
+                </span>
+
                 <div
                     style={{
                         width: '12px',
@@ -137,17 +104,8 @@ const MovingAverageItem: React.FC<{
                     onClick={() => onToggleVisibility(index)}
                     title={config.visible ? 'Hide' : 'Show'}
                 />
-                <span style={{
-                    fontSize: isMobile ? '11px' : '12px',
-                    color: theme === 'dark' ? 
-                        (config.visible ? '#fff' : 'rgba(255,255,255,0.4)') : 
-                        (config.visible ? '#000' : 'rgba(0,0,0,0.4)'),
-                    textDecoration: config.visible ? 'none' : 'line-through'
-                }}>
-                    {config.type.toUpperCase()}({config.period})
-                </span>
             </div>
-            {/* <button
+            <button
                 onClick={() => onRemove(index)}
                 style={{
                     background: 'transparent',
@@ -160,7 +118,7 @@ const MovingAverageItem: React.FC<{
                 title="Remove"
             >
                 ×
-            </button> */}
+            </button>
         </div>
     );
 };

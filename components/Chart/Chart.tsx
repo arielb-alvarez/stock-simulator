@@ -12,6 +12,9 @@ interface ChartProps {
     drawings: Drawing[];
     onDrawingsUpdate: (drawings: Drawing[]) => void;
     timeframe: string;
+    // New props for real-time updates
+    realTimeData?: CandleStickData | null;
+    isRealTime?: boolean;
 }
 
 const Chart: React.FC<ChartProps> = ({ 
@@ -19,7 +22,9 @@ const Chart: React.FC<ChartProps> = ({
     config, 
     drawings, 
     onDrawingsUpdate, 
-    timeframe
+    timeframe,
+    realTimeData = null,
+    isRealTime = false
 }) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi>();
@@ -30,6 +35,9 @@ const Chart: React.FC<ChartProps> = ({
     const [isMobile, setIsMobile] = useState(false);
     const [chartDimensions, setChartDimensions] = useState({ width: 0, height: 0 });
     const [viewportVersion, setViewportVersion] = useState(0);
+    
+    // Track the last processed data point for real-time updates
+    const lastProcessedTimeRef = useRef<number>(0);
     
     // Use global moving average configurations
     const [movingAverageConfigs, setMovingAverageConfigs] = useState<MovingAverageConfig[]>(
@@ -145,8 +153,28 @@ const Chart: React.FC<ChartProps> = ({
         };
     }, [config.theme]);
 
+    // Real-time moving average calculation for single point
+    const calculateRealTimeMA = useCallback((data: CandleStickData[], newPoint: CandleStickData, config: MovingAverageConfig) => {
+        if (data.length < config.period) return null;
+
+        const relevantData = [...data.slice(-config.period + 1), newPoint];
+        
+        switch (config.type) {
+            case 'sma':
+                return MovingAverageService.calculateSMA(relevantData, config.period, config.priceSource)[0];
+            case 'ema':
+                return MovingAverageService.calculateEMA(relevantData, config.period, config.priceSource)[0];
+            case 'wma':
+                return MovingAverageService.calculateWMA(relevantData, config.period, config.priceSource)[0];
+            case 'vwma':
+                return MovingAverageService.calculateVWMA(relevantData, config.period, config.priceSource)[0];
+            default:
+                return null;
+        }
+    }, []);
+
     // Update moving averages function
-    const updateMovingAverages = useCallback(() => {
+    const updateMovingAverages = useCallback((isRealTimeUpdate = false, newDataPoint?: CandleStickData) => {
         if (!chartRef.current || !data.length) return;
 
         // Get current configs directly from the service to ensure we have the latest
@@ -169,29 +197,89 @@ const Chart: React.FC<ChartProps> = ({
             if (!config.visible) return;
 
             const maId = generateMAId(config);
+            const existingSeries = movingAverageSeriesRef.current.get(maId);
             
-            // Skip if series already exists and is visible
-            if (movingAverageSeriesRef.current.has(maId)) {
-                return;
-            }
+            if (isRealTimeUpdate && existingSeries && newDataPoint) {
+                // Real-time update for existing series
+                const maPoint = calculateRealTimeMA(data, newDataPoint, config);
+                if (maPoint) {
+                    existingSeries.update({
+                        time: (newDataPoint.time / 1000) as UTCTimestamp,
+                        value: maPoint.value
+                    });
+                }
+            } else {
+                // Full recalculation for new series or non-real-time updates
+                const maResult = MovingAverageService.calculateMovingAverage(data, config);
+                
+                if (maResult.data.length > 0) {
+                    if (existingSeries) {
+                        // Update existing series with full data
+                        existingSeries.setData(maResult.data);
+                    } else {
+                        // Create new series
+                        const maSeries = chartRef.current!.addLineSeries({
+                            color: config.color,
+                            lineWidth: config.lineWidth,
+                            title: `${config.type.toUpperCase()}(${config.period})`,
+                            priceScaleId: 'right',
+                        });
 
-            const maResult = MovingAverageService.calculateMovingAverage(data, config);
-            
-            if (maResult.data.length > 0) {
-                const maSeries = chartRef.current!.addLineSeries({
-                    color: config.color,
-                    lineWidth: config.lineWidth,
-                    title: `${config.type.toUpperCase()}(${config.period})`,
-                    priceScaleId: 'right',
-                });
-
-                maSeries.setData(maResult.data);
-                movingAverageSeriesRef.current.set(maId, maSeries);
+                        maSeries.setData(maResult.data);
+                        movingAverageSeriesRef.current.set(maId, maSeries);
+                    }
+                }
             }
         });
-    }, [data, generateMAId]);
+    }, [data, generateMAId, calculateRealTimeMA]);
 
-    // Update chart data and moving averages
+    // Handle real-time data updates
+    useEffect(() => {
+        if (!isRealTime || !realTimeData || !data.length) return;
+
+        const newDataTime = realTimeData.time;
+        
+        // Check if this is actually new data to avoid unnecessary updates
+        if (newDataTime <= lastProcessedTimeRef.current) {
+            return;
+        }
+
+        lastProcessedTimeRef.current = newDataTime;
+
+        // Update candlestick series with real-time data
+        if (seriesRef.current) {
+            const formattedData = {
+                time: (realTimeData.time / 1000) as UTCTimestamp,
+                open: realTimeData.open,
+                high: realTimeData.high,
+                low: realTimeData.low,
+                close: realTimeData.close,
+            };
+
+            // Check if we're updating an existing candle or creating a new one
+            const lastCandle = data[data.length - 1];
+            const isSameCandle = lastCandle && lastCandle.time === realTimeData.time;
+            
+            if (isSameCandle) {
+                // Update the last candle
+                seriesRef.current.update(formattedData);
+            } else {
+                // Add new candle - in a real app you might want to manage this differently
+                seriesRef.current.update(formattedData);
+            }
+        }
+
+        // Update moving averages in real-time
+        updateMovingAverages(true, realTimeData);
+
+        // Auto-scroll if needed
+        if (chartRef.current) {
+            chartRef.current.timeScale().scrollToPosition(0, false);
+        }
+
+    }, [realTimeData, isRealTime, data, updateMovingAverages]);
+
+    // Update chart data and moving averages (for full dataset changes)
     useEffect(() => {
         if (!seriesRef.current || !data.length) return;
 
@@ -206,19 +294,24 @@ const Chart: React.FC<ChartProps> = ({
         seriesRef.current.setData(formattedData);
         
         // Update moving averages - this will use the latest configs
-        updateMovingAverages();
+        updateMovingAverages(false);
         
         if (chartRef.current && formattedData.length > 0) {
             chartRef.current.timeScale().fitContent();
         }
         
         setViewportVersion(prev => prev + 1);
+        
+        // Reset last processed time when full dataset changes
+        if (data.length > 0) {
+            lastProcessedTimeRef.current = data[data.length - 1].time;
+        }
     }, [data, timeframe, updateMovingAverages]);
 
     // Update moving averages when configs change
     useEffect(() => {
         if (isChartReady && data.length > 0) {
-            updateMovingAverages();
+            updateMovingAverages(false);
         }
     }, [movingAverageConfigs, isChartReady, data.length, updateMovingAverages]);
 

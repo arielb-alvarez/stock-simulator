@@ -4,7 +4,7 @@ import Chart from '../components/Chart/Chart';
 import Header from '../components/UI/Header';
 import useCryptoData from '../hooks/useCryptoData';
 import useCookies from '../hooks/useCookies';
-import { ChartConfig } from '../types';
+import { ChartConfig, MovingAverageConfig } from '../types';
 
 const Home: React.FC = () => {
   const [timeframe, setTimeframe] = useState('5m');
@@ -36,6 +36,12 @@ const Home: React.FC = () => {
     }
   };
 
+  const [movingAverages, setMovingAverages] = useState<MovingAverageConfig[]>([]);
+
+  const handleAddMovingAverage = (maConfig: MovingAverageConfig) => {
+    setMovingAverages(prev => [...prev, maConfig]);
+  };
+
   return (
     <div className={`container ${config.theme}`}>
       <Head>
@@ -52,6 +58,7 @@ const Home: React.FC = () => {
         onConfigChange={updateConfig}
         isConnected={isConnected}
         onClearDrawings={handleClearDrawings}
+        onAddMovingAverage={handleAddMovingAverage}
       />
 
       <main className="chart-main">
