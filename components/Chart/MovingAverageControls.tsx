@@ -38,7 +38,7 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '4px',
-                background: "rgb(229 229 229 / 50%)",
+                background: "rgb(255 255 255 / 80%)",
                 borderRadius: "5px",
             }}>
                 {configs.map((config, index) => (
