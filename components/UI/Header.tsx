@@ -57,9 +57,7 @@ const Header: React.FC<HeaderProps> = ({
     <header className="main-header">
       <div className="header-left">
         <h1 className="chart-title">BTC/USDT</h1>
-        <div className="status-controls">
-          <ConnectionStatus isConnected={isConnected} theme={config.theme} />
-          
+        <div className="status-controls">          
           {/* Timeframe Dropdown Button */}
           <div className="timeframe-dropdown">
             <button 

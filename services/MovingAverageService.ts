@@ -111,16 +111,7 @@ class MovingAverageConfigManager {
     }
 
     private static getDefaultConfigs(): MovingAverageConfig[] {
-        return [
-            {
-                period: 20,
-                color: '#3B82F6',
-                lineWidth: 1,
-                type: 'sma',
-                priceSource: 'close',
-                visible: true
-            },
-        ];
+        return [];
     }
 }
 

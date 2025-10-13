@@ -1,5 +1,5 @@
 // components/MovingAverageControls.tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { MovingAverageConfig } from '../../types';
 import MovingAverageConfigDialog from './MovingAverageConfigDialog';
 
@@ -8,6 +8,7 @@ interface MovingAverageControlsProps {
     onConfigsUpdate: (configs: MovingAverageConfig[]) => void;
     onToggleVisibility: (index: number) => void;
     onAddMovingAverage: (config: MovingAverageConfig) => void;
+    onUpdateMovingAverage: (index: number, config: MovingAverageConfig) => void;
     onRemoveMovingAverage: (index: number) => void;
     theme: 'light' | 'dark';
     isMobile: boolean;
@@ -16,17 +17,38 @@ interface MovingAverageControlsProps {
 const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
     configs,
     onToggleVisibility,
-    onAddMovingAverage,
+    onUpdateMovingAverage,
     onRemoveMovingAverage,
     theme,
     isMobile
 }) => {
-    const [showConfigDialog, setShowConfigDialog] = useState(false);
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [isClient, setIsClient] = useState(false);
 
-    const handleAddMovingAverage = useCallback((config: MovingAverageConfig) => {
-        onAddMovingAverage(config);
-        setShowConfigDialog(false);
-    }, [onAddMovingAverage]);
+    // Ensure this only runs on client
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+
+    const handleUpdateMovingAverage = useCallback((config: MovingAverageConfig) => {
+        if (editingIndex !== null) {
+            onUpdateMovingAverage(editingIndex, config);
+            setEditingIndex(null);
+        }
+    }, [editingIndex, onUpdateMovingAverage]);
+
+    const handleEditClick = useCallback((index: number) => {
+        setEditingIndex(index);
+    }, []);
+
+    const handleCloseEditDialog = useCallback(() => {
+        setEditingIndex(null);
+    }, []);
+
+    // Don't render anything on server to avoid hydration mismatch
+    if (!isClient) {
+        return null;
+    }
 
     return (
         <>
@@ -38,8 +60,6 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '4px',
-                background: "rgb(255 255 255 / 80%)",
-                borderRadius: "5px",
             }}>
                 {configs.length > 0 && configs.map((config, index) => (
                     <MovingAverageItem
@@ -47,6 +67,7 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                         config={config}
                         index={index}
                         onToggleVisibility={onToggleVisibility}
+                        onEdit={handleEditClick}
                         onRemove={onRemoveMovingAverage}
                         theme={theme}
                         isMobile={isMobile}
@@ -54,12 +75,15 @@ const MovingAverageControls: React.FC<MovingAverageControlsProps> = ({
                 ))}
             </div>
 
-            {showConfigDialog && (
+            {/* Edit existing MA dialog */}
+            {editingIndex !== null && (
                 <MovingAverageConfigDialog
-                    onSave={handleAddMovingAverage}
-                    onClose={() => setShowConfigDialog(false)}
+                    config={configs[editingIndex]}
+                    onSave={handleUpdateMovingAverage}
+                    onClose={handleCloseEditDialog}
                     theme={theme}
                     isMobile={isMobile}
+                    isEditing={true}
                 />
             )}
         </>
@@ -70,28 +94,40 @@ const MovingAverageItem: React.FC<{
     config: MovingAverageConfig;
     index: number;
     onToggleVisibility: (index: number) => void;
+    onEdit: (index: number) => void;
     onRemove: (index: number) => void;
     theme: 'light' | 'dark';
     isMobile: boolean;
-}> = ({ config, index, onToggleVisibility, onRemove, theme, isMobile }) => {
+}> = ({ config, index, onToggleVisibility, onEdit, onRemove, theme, isMobile }) => {
     return (
         <div style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '4px',
+            padding: '4px 8px',
+            borderRadius: '3px',
+            background: 'rgba(255, 255, 255, 0.5)',
+            marginBottom: '2px'
         }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                minWidth: 0 // Allow text truncation
+            }}>
+                {/* MA Label - Moved to the beginning */}
                 <span style={{
                     fontSize: '11px',
-                    color: theme === 'dark' ? 
-                        (config.visible ? '#fff' : 'rgba(255,255,255,0.4)') : 
-                        (config.visible ? '#000' : 'rgba(0,0,0,0.4)'),
-                    textDecoration: config.visible ? 'none' : 'line-through'
+                    color: 'rgba(0,0,0,0.6)',
+                    textDecoration: config.visible ? 'none' : 'line-through',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    flex: 1
                 }}>
                     {config.type.toUpperCase()}({config.period})
                 </span>
 
+                {/* Visibility Toggle Circle */}
                 <div
                     style={{
                         width: '12px',
@@ -99,21 +135,64 @@ const MovingAverageItem: React.FC<{
                         borderRadius: '50%',
                         background: config.visible ? config.color : 'transparent',
                         border: `2px solid ${config.color}`,
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        flexShrink: 0
                     }}
                     onClick={() => onToggleVisibility(index)}
                     title={config.visible ? 'Hide' : 'Show'}
                 />
+
+                {/* Edit Button (Gear Icon) */}
+                <button
+                    onClick={() => onEdit(index)}
+                    style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'rgba(0,0,0,0.6)',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        padding: '2px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '3px',
+                        width: '20px',
+                        height: '20px',
+                        flexShrink: 0
+                    }}
+                    title="Edit configuration"
+                >
+                    <svg 
+                        width="12" 
+                        height="12" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2"
+                    >
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                </button>
             </div>
+            
+            {/* Remove Button */}
             <button
                 onClick={() => onRemove(index)}
                 style={{
                     background: 'transparent',
                     border: 'none',
-                    color: theme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)',
+                    color: 'rgba(0,0,0,0.6)',
                     cursor: 'pointer',
-                    fontSize: '14px',
-                    padding: '2px 6px'
+                    fontSize: '16px',
+                    padding: '0 4px',
+                    width: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '3px',
+                    flexShrink: 0
                 }}
                 title="Remove"
             >
