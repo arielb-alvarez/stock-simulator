@@ -38,13 +38,21 @@ const Chart: React.FC<ChartProps> = ({
     
     // Track the last processed data point for real-time updates
     const lastProcessedTimeRef = useRef<number>(0);
+    // Track the current dataset including real-time updates
+    const currentDataRef = useRef<CandleStickData[]>([]);
     
     // Use global moving average configurations
     const [movingAverageConfigs, setMovingAverageConfigs] = useState<MovingAverageConfig[]>(
         MovingAverageService.getConfigs()
     );
 
-    const lastViewportState = useRef<string>('');
+    // Initialize currentDataRef when data prop changes
+    useEffect(() => {
+        currentDataRef.current = [...data];
+        if (data.length > 0) {
+            lastProcessedTimeRef.current = data[data.length - 1].time;
+        }
+    }, [data]);
 
     // Subscribe to global configuration changes
     useEffect(() => {
@@ -87,6 +95,7 @@ const Chart: React.FC<ChartProps> = ({
             timeScale: {
                 timeVisible: true,
                 secondsVisible: false,
+                barSpacing: isMobile ? 2 : 5,
             },
             crosshair: {
                 mode: CrosshairMode.Normal,
@@ -152,36 +161,16 @@ const Chart: React.FC<ChartProps> = ({
             }
             setIsChartReady(false);
         };
-    }, [config.theme]);
+    }, [config.theme, isMobile]);
 
-    // Real-time moving average calculation for single point
-    const calculateRealTimeMA = useCallback((data: CandleStickData[], newPoint: CandleStickData, config: MovingAverageConfig) => {
-        if (data.length < config.period) return null;
+    // Enhanced moving average calculation that works with current dataset
+    const calculateMovingAverages = useCallback((dataForCalculation: CandleStickData[]) => {
+        if (!chartRef.current || !dataForCalculation.length) return;
 
-        const relevantData = [...data.slice(-config.period + 1), newPoint];
-        
-        switch (config.type) {
-            case 'sma':
-                return MovingAverageService.calculateSMA(relevantData, config.period, config.priceSource)[0];
-            case 'ema':
-                return MovingAverageService.calculateEMA(relevantData, config.period, config.priceSource)[0];
-            case 'wma':
-                return MovingAverageService.calculateWMA(relevantData, config.period, config.priceSource)[0];
-            case 'vwma':
-                return MovingAverageService.calculateVWMA(relevantData, config.period, config.priceSource)[0];
-            default:
-                return null;
-        }
-    }, []);
-
-    // Update moving averages function
-    const updateMovingAverages = useCallback((isRealTimeUpdate = false, newDataPoint?: CandleStickData) => {
-        if (!chartRef.current || !data.length) return;
-
-        // Get current configs directly from the service to ensure we have the latest
+        // Get current configs directly from the service
         const currentConfigs = MovingAverageService.getConfigs();
         
-        // Remove only the series that are no longer needed or have changed significantly
+        // Remove only the series that are no longer needed
         const currentMAIds = new Set(currentConfigs.map(generateMAId));
         
         // Remove series that are no longer in configs
@@ -208,95 +197,97 @@ const Chart: React.FC<ChartProps> = ({
             const maId = generateMAId(config);
             const existingSeries = movingAverageSeriesRef.current.get(maId);
             
-            if (isRealTimeUpdate && existingSeries && newDataPoint) {
-                // Real-time update for existing series
-                const maPoint = calculateRealTimeMA(data, newDataPoint, config);
-                if (maPoint) {
-                    existingSeries.update({
-                        time: (newDataPoint.time / 1000) as UTCTimestamp,
-                        value: maPoint.value
+            // Full recalculation
+            const maResult = MovingAverageService.calculateMovingAverage(dataForCalculation, config);
+            
+            if (maResult.data.length > 0) {
+                if (existingSeries) {
+                    // Update existing series with full data and new style
+                    existingSeries.applyOptions({
+                        color: config.color,
+                        lineWidth: config.lineWidth,
+                        title: `${config.type.toUpperCase()}(${config.period})`,
                     });
-                }
-            } else {
-                // Full recalculation for new series, edits, or non-real-time updates
-                const maResult = MovingAverageService.calculateMovingAverage(data, config);
-                
-                if (maResult.data.length > 0) {
-                    if (existingSeries) {
-                        // Update existing series with full data and new style
-                        existingSeries.applyOptions({
-                            color: config.color,
-                            lineWidth: config.lineWidth,
-                            title: `${config.type.toUpperCase()}(${config.period})`,
-                        });
-                        existingSeries.setData(maResult.data);
-                    } else {
-                        // Create new series
-                        const maSeries = chartRef.current!.addLineSeries({
-                            color: config.color,
-                            lineWidth: config.lineWidth,
-                            title: `${config.type.toUpperCase()}(${config.period})`,
-                            priceScaleId: 'right',
-                        });
+                    existingSeries.setData(maResult.data);
+                } else {
+                    // Create new series
+                    const maSeries = chartRef.current!.addLineSeries({
+                        color: config.color,
+                        lineWidth: config.lineWidth,
+                        title: `${config.type.toUpperCase()}(${config.period})`,
+                        priceScaleId: 'right',
+                    });
 
-                        maSeries.setData(maResult.data);
-                        movingAverageSeriesRef.current.set(maId, maSeries);
-                    }
+                    maSeries.setData(maResult.data);
+                    movingAverageSeriesRef.current.set(maId, maSeries);
                 }
             }
         });
-    }, [data, generateMAId, calculateRealTimeMA]);
+    }, [generateMAId]);
 
-    // Handle real-time data updates
+    // Handle real-time data updates - FIXED VERSION
     useEffect(() => {
-        if (!isRealTime || !realTimeData || !data.length) return;
+        if (!isRealTime || !realTimeData || !currentDataRef.current.length) return;
 
         const newDataTime = realTimeData.time;
         
-        // Check if this is actually new data to avoid unnecessary updates
+        // Check if this is actually new data
         if (newDataTime <= lastProcessedTimeRef.current) {
             return;
         }
 
         lastProcessedTimeRef.current = newDataTime;
 
-        // Update candlestick series with real-time data
-        if (seriesRef.current) {
-            const formattedData = {
-                time: (realTimeData.time / 1000) as UTCTimestamp,
-                open: realTimeData.open,
-                high: realTimeData.high,
-                low: realTimeData.low,
-                close: realTimeData.close,
-            };
+        // Update our current dataset
+        const lastCandle = currentDataRef.current[currentDataRef.current.length - 1];
+        const isSameCandle = lastCandle && lastCandle.time === realTimeData.time;
+        
+        if (isSameCandle) {
+            // Update the last candle in our dataset
+            currentDataRef.current[currentDataRef.current.length - 1] = realTimeData;
+        } else {
+            // Add new candle to our dataset
+            currentDataRef.current = [...currentDataRef.current, realTimeData];
+        }
 
-            // Check if we're updating an existing candle or creating a new one
-            const lastCandle = data[data.length - 1];
-            const isSameCandle = lastCandle && lastCandle.time === realTimeData.time;
+        // Update candlestick series with the latest dataset
+        if (seriesRef.current) {
+            const formattedData = currentDataRef.current.map(item => ({
+                time: (item.time / 1000) as UTCTimestamp,
+                open: item.open,
+                high: item.high,
+                low: item.low,
+                close: item.close,
+            }));
+
+            // For real-time updates, we update the entire series to ensure consistency
+            seriesRef.current.setData(formattedData);
+        }
+
+        // Update moving averages with the current dataset
+        calculateMovingAverages(currentDataRef.current);
+
+        // Auto-scroll to show latest data if user is near the end
+        if (chartRef.current) {
+            const timeScale = chartRef.current.timeScale();
+            const visibleRange = timeScale.getVisibleLogicalRange();
             
-            if (isSameCandle) {
-                // Update the last candle
-                seriesRef.current.update(formattedData);
-            } else {
-                // Add new candle - in a real app you might want to manage this differently
-                seriesRef.current.update(formattedData);
+            if (visibleRange && visibleRange.to > currentDataRef.current.length - 10) {
+                timeScale.scrollToPosition(0, false);
             }
         }
 
-        // Update moving averages in real-time
-        updateMovingAverages(true, realTimeData);
+        setViewportVersion(prev => prev + 1);
 
-        // Auto-scroll if needed
-        if (chartRef.current) {
-            chartRef.current.timeScale().scrollToPosition(0, false);
-        }
+    }, [realTimeData, isRealTime, calculateMovingAverages]);
 
-    }, [realTimeData, isRealTime, data, updateMovingAverages]);
-
-    // Update chart data and moving averages (for full dataset changes)
+    // Update chart with initial data and when timeframe changes
     useEffect(() => {
         if (!seriesRef.current || !data.length) return;
 
+        // Reset current data when main dataset changes
+        currentDataRef.current = [...data];
+        
         const formattedData = data.map(item => ({
             time: (item.time / 1000) as UTCTimestamp,
             open: item.open,
@@ -307,8 +298,8 @@ const Chart: React.FC<ChartProps> = ({
 
         seriesRef.current.setData(formattedData);
         
-        // Update moving averages - this will use the latest configs
-        updateMovingAverages(false);
+        // Update moving averages with the full dataset
+        calculateMovingAverages(data);
         
         if (chartRef.current && formattedData.length > 0) {
             chartRef.current.timeScale().fitContent();
@@ -320,19 +311,18 @@ const Chart: React.FC<ChartProps> = ({
         if (data.length > 0) {
             lastProcessedTimeRef.current = data[data.length - 1].time;
         }
-    }, [data, timeframe, updateMovingAverages]);
+    }, [data, timeframe, calculateMovingAverages]);
 
     // Update moving averages when configs change
     useEffect(() => {
-        if (isChartReady && data.length > 0) {
-            updateMovingAverages(false);
+        if (isChartReady && currentDataRef.current.length > 0) {
+            calculateMovingAverages(currentDataRef.current);
         }
-    }, [movingAverageConfigs, isChartReady, data.length, updateMovingAverages]);
+    }, [movingAverageConfigs, isChartReady, calculateMovingAverages]);
 
-    // Handle moving average configuration changes - now updates globally
+    // Handle moving average configuration changes
     const handleMovingAveragesUpdate = useCallback((newConfigs: MovingAverageConfig[]) => {
         MovingAverageService.setConfigs(newConfigs);
-        // No need to call setMovingAverageConfigs here because we're subscribed to changes
     }, []);
 
     // Toggle moving average visibility globally
@@ -358,12 +348,6 @@ const Chart: React.FC<ChartProps> = ({
     const updateMovingAverage = useCallback((index: number, config: MovingAverageConfig) => {
         MovingAverageService.updateConfig(index, config);
     }, []);
-
-    useEffect(() => {
-        if (isChartReady && data.length > 0) {
-            updateMovingAverages(false);
-        }
-    }, [movingAverageConfigs, isChartReady, data.length, updateMovingAverages]);
 
     // Check for mobile view
     useEffect(() => {
