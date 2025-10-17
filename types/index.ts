@@ -62,3 +62,14 @@ export interface MovingAverageSeries {
   config: MovingAverageConfig;
   data: { time: UTCTimestamp; value: number }[];
 }
+
+// RSI Types
+export interface RSIConfig {
+  id: string;
+  period: number;
+  visible: boolean;
+  color: string;
+  lineWidth: number;
+  overbought: number;
+  oversold: number;
+}
