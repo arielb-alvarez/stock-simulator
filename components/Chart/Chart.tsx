@@ -92,7 +92,7 @@ const Chart: React.FC<ChartProps> = ({
 
         const chart = createChart(chartContainerRef.current, {
             layout: {
-                background: { type: 'solid', color: config.theme === 'dark' ? '#131722' : '#FFFFFF' },
+                background: { topColor: 'solid', color: config.theme === 'dark' ? '#131722' : '#FFFFFF' },
                 textColor: config.theme === 'dark' ? '#D9D9D9' : '#191919',
                 fontSize: isMobile ? 12 : 14,
             },
