@@ -1,5 +1,10 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { createChart, CrosshairMode, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
+import { 
+  createChart, 
+  IChartApi, 
+  ISeriesApi,
+  Time
+} from 'lightweight-charts';
 import { CandleStickData, ChartConfig, Drawing } from '../../types';
 import { MovingAverageConfig, MovingAverageService } from '../../services/MovingAverageService';
 import ChartContainer from './ChartContainer';
@@ -12,7 +17,6 @@ interface ChartProps {
     drawings: Drawing[];
     onDrawingsUpdate: (drawings: Drawing[]) => void;
     timeframe: string;
-    // New props for real-time updates
     realTimeData?: CandleStickData | null;
     isRealTime?: boolean;
 }
@@ -36,12 +40,9 @@ const Chart: React.FC<ChartProps> = ({
     const [chartDimensions, setChartDimensions] = useState({ width: 0, height: 0 });
     const [viewportVersion, setViewportVersion] = useState(0);
     
-    // Track the last processed data point for real-time updates
     const lastProcessedTimeRef = useRef<number>(0);
-    // Track the current dataset including real-time updates
     const currentDataRef = useRef<CandleStickData[]>([]);
     
-    // Use global moving average configurations
     const [movingAverageConfigs, setMovingAverageConfigs] = useState<MovingAverageConfig[]>(
         MovingAverageService.getConfigs()
     );
@@ -80,27 +81,67 @@ const Chart: React.FC<ChartProps> = ({
                 setChartDimensions({ width, height });
                 
                 if (chartRef.current) {
-                    chartRef.current.applyOptions({ width, height });
+                    chartRef.current.applyOptions({ 
+                        width, 
+                        height,
+                        autoSize: true 
+                    });
                 }
             }
         };
 
         const chart = createChart(chartContainerRef.current, {
             layout: {
-                backgroundColor: config.theme === 'dark' ? '#131722' : '#FFFFFF',
+                background: { type: 'solid', color: config.theme === 'dark' ? '#131722' : '#FFFFFF' },
                 textColor: config.theme === 'dark' ? '#D9D9D9' : '#191919',
+                fontSize: isMobile ? 12 : 14,
             },
             width: chartContainerRef.current.clientWidth,
             height: chartContainerRef.current.clientHeight,
             timeScale: {
                 timeVisible: true,
                 secondsVisible: false,
-                barSpacing: isMobile ? 2 : 5,
+                borderVisible: false,
+            },
+            rightPriceScale: {
+                borderVisible: false,
+                autoScale: true,
+            },
+            grid: {
+                vertLines: { visible: false },
+                horzLines: { visible: false },
             },
             crosshair: {
-                mode: CrosshairMode.Normal,
+                mode: 1, // Normal mode
+                vertLine: {
+                    width: 1,
+                    color: config.theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+                    style: 2, // Dotted
+                    labelBackgroundColor: config.theme === 'dark' ? '#131722' : '#FFFFFF',
+                },
+                horzLine: {
+                    width: 1,
+                    color: config.theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+                    style: 2, // Dotted
+                    labelBackgroundColor: config.theme === 'dark' ? '#131722' : '#FFFFFF',
+                },
             },
-        } as any);
+            handleScroll: {
+                mouseWheel: true,
+                pressedMouseMove: true,
+                horzTouchDrag: true,
+                vertTouchDrag: true,
+            },
+            handleScale: {
+                axisPressedMouseMove: true,
+                mouseWheel: true,
+                pinch: true,
+            },
+            kineticScroll: {
+                mouse: false,
+                touch: true,
+            },
+        });
 
         const series = chart.addCandlestickSeries({
             upColor: '#26a69a',
@@ -108,6 +149,7 @@ const Chart: React.FC<ChartProps> = ({
             borderVisible: false,
             wickUpColor: '#26a69a',
             wickDownColor: '#ef5350',
+            priceScaleId: 'right',
         });
 
         chartRef.current = chart;
@@ -128,6 +170,7 @@ const Chart: React.FC<ChartProps> = ({
         const timeScale = chart.timeScale();
         timeScale.subscribeVisibleTimeRangeChange(handleViewportChange);
         timeScale.subscribeVisibleLogicalRangeChange(handleViewportChange);
+        
         chart.subscribeCrosshairMove(handleViewportChange);
         chart.subscribeClick(handleViewportChange);
 
@@ -150,15 +193,12 @@ const Chart: React.FC<ChartProps> = ({
                 chartContainerRef.current.removeEventListener('wheel', handleWheel);
             }
             
-            // Clean up moving average series
             movingAverageSeriesRef.current.forEach((series) => {
                 chart.removeSeries(series);
             });
             movingAverageSeriesRef.current.clear();
             
-            if (chart) {
-                chart.remove();
-            }
+            chart.remove();
             setIsChartReady(false);
         };
     }, [config.theme, isMobile]);
@@ -167,10 +207,7 @@ const Chart: React.FC<ChartProps> = ({
     const calculateMovingAverages = useCallback((dataForCalculation: CandleStickData[]) => {
         if (!chartRef.current || !dataForCalculation.length) return;
 
-        // Get current configs directly from the service
         const currentConfigs = MovingAverageService.getConfigs();
-        
-        // Remove only the series that are no longer needed
         const currentMAIds = new Set(currentConfigs.map(generateMAId));
         
         // Remove series that are no longer in configs
@@ -184,7 +221,6 @@ const Chart: React.FC<ChartProps> = ({
         // Calculate and add/update moving averages
         currentConfigs.forEach(config => {
             if (!config.visible) {
-                // Remove if exists but not visible
                 const maId = generateMAId(config);
                 const existingSeries = movingAverageSeriesRef.current.get(maId);
                 if (existingSeries) {
@@ -197,12 +233,10 @@ const Chart: React.FC<ChartProps> = ({
             const maId = generateMAId(config);
             const existingSeries = movingAverageSeriesRef.current.get(maId);
             
-            // Full recalculation
             const maResult = MovingAverageService.calculateMovingAverage(dataForCalculation, config);
             
             if (maResult.data.length > 0) {
                 if (existingSeries) {
-                    // Update existing series with full data and new style
                     existingSeries.applyOptions({
                         color: config.color,
                         lineWidth: config.lineWidth,
@@ -210,12 +244,13 @@ const Chart: React.FC<ChartProps> = ({
                     });
                     existingSeries.setData(maResult.data);
                 } else {
-                    // Create new series
                     const maSeries = chartRef.current!.addLineSeries({
                         color: config.color,
                         lineWidth: config.lineWidth,
                         title: `${config.type.toUpperCase()}(${config.period})`,
                         priceScaleId: 'right',
+                        lastValueVisible: true,
+                        priceLineVisible: false,
                     });
 
                     maSeries.setData(maResult.data);
@@ -225,49 +260,41 @@ const Chart: React.FC<ChartProps> = ({
         });
     }, [generateMAId]);
 
-    // Handle real-time data updates - FIXED VERSION
+    // Handle real-time data updates
     useEffect(() => {
         if (!isRealTime || !realTimeData || !currentDataRef.current.length) return;
 
         const newDataTime = realTimeData.time;
         
-        // Check if this is actually new data
         if (newDataTime <= lastProcessedTimeRef.current) {
             return;
         }
 
         lastProcessedTimeRef.current = newDataTime;
 
-        // Update our current dataset
         const lastCandle = currentDataRef.current[currentDataRef.current.length - 1];
         const isSameCandle = lastCandle && lastCandle.time === realTimeData.time;
         
         if (isSameCandle) {
-            // Update the last candle in our dataset
             currentDataRef.current[currentDataRef.current.length - 1] = realTimeData;
         } else {
-            // Add new candle to our dataset
             currentDataRef.current = [...currentDataRef.current, realTimeData];
         }
 
-        // Update candlestick series with the latest dataset
         if (seriesRef.current) {
             const formattedData = currentDataRef.current.map(item => ({
-                time: (item.time / 1000) as UTCTimestamp,
+                time: (item.time / 1000) as Time,
                 open: item.open,
                 high: item.high,
                 low: item.low,
                 close: item.close,
             }));
 
-            // For real-time updates, we update the entire series to ensure consistency
             seriesRef.current.setData(formattedData);
         }
 
-        // Update moving averages with the current dataset
         calculateMovingAverages(currentDataRef.current);
 
-        // Auto-scroll to show latest data if user is near the end
         if (chartRef.current) {
             const timeScale = chartRef.current.timeScale();
             const visibleRange = timeScale.getVisibleLogicalRange();
@@ -285,11 +312,10 @@ const Chart: React.FC<ChartProps> = ({
     useEffect(() => {
         if (!seriesRef.current || !data.length) return;
 
-        // Reset current data when main dataset changes
         currentDataRef.current = [...data];
         
         const formattedData = data.map(item => ({
-            time: (item.time / 1000) as UTCTimestamp,
+            time: (item.time / 1000) as Time,
             open: item.open,
             high: item.high,
             low: item.low,
@@ -297,8 +323,6 @@ const Chart: React.FC<ChartProps> = ({
         }));
 
         seriesRef.current.setData(formattedData);
-        
-        // Update moving averages with the full dataset
         calculateMovingAverages(data);
         
         if (chartRef.current && formattedData.length > 0) {
@@ -307,7 +331,6 @@ const Chart: React.FC<ChartProps> = ({
         
         setViewportVersion(prev => prev + 1);
         
-        // Reset last processed time when full dataset changes
         if (data.length > 0) {
             lastProcessedTimeRef.current = data[data.length - 1].time;
         }
@@ -325,7 +348,6 @@ const Chart: React.FC<ChartProps> = ({
         MovingAverageService.setConfigs(newConfigs);
     }, []);
 
-    // Toggle moving average visibility globally
     const toggleMovingAverageVisibility = useCallback((index: number) => {
         const newConfigs = [...movingAverageConfigs];
         newConfigs[index] = {
@@ -335,12 +357,10 @@ const Chart: React.FC<ChartProps> = ({
         MovingAverageService.setConfigs(newConfigs);
     }, [movingAverageConfigs]);
 
-    // Add new moving average globally
     const addMovingAverage = useCallback((config: MovingAverageConfig) => {
         MovingAverageService.addConfig({ ...config, visible: true });
     }, []);
 
-    // Remove moving average globally
     const removeMovingAverage = useCallback((index: number) => {
         MovingAverageService.removeConfig(index);
     }, []);
@@ -373,7 +393,6 @@ const Chart: React.FC<ChartProps> = ({
                 }} 
             />
             
-            {/* Moving Average Controls */}
             <MovingAverageControls
                 configs={movingAverageConfigs}
                 onConfigsUpdate={handleMovingAveragesUpdate}
