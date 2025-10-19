@@ -1,9 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { ChartConfig, MovingAverageConfig } from '../../types';
+import { ChartConfig, MovingAverageConfig, RSIConfig } from '../../types';
 import { SunIcon, MoonIcon, ClearIcon, IndicatorIcon } from './../DrawingTools/Icons';
 import ConnectionStatus from './ConnectionStatus';
 import MovingAverageConfigDialog from './../Chart/MovingAverageConfigDialog';
 import MovingAverageService from '@/services/MovingAverageService';
+import RSIConfigDialog from '../Chart/RSIConfigDialog';
+import RSIService from '@/services/RSIService';
 
 interface HeaderProps {
   timeframe: string;
@@ -27,12 +29,14 @@ const Header: React.FC<HeaderProps> = ({
   const [showTimeframes, setShowTimeframes] = useState(false);
   const [showIndicators, setShowIndicators] = useState(false);
   const [showMADialog, setShowMADialog] = useState(false);
+  const [showRSIDialog, setShowRSIDialog] = useState(false);
 
   const availableTimeframes = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'];
   
   // Available indicators
   const availableIndicators = [
     'Moving Average',
+    'RSI'
   ];
 
   const handleTimeframeSelect = (tf: string) => {
@@ -51,6 +55,12 @@ const Header: React.FC<HeaderProps> = ({
   const addMovingAverage = useCallback((config: MovingAverageConfig) => {
       MovingAverageService.addConfig({ ...config, visible: true });
       setShowMADialog(false);
+  }, []);
+
+  // ADDED: Add new RSI globally
+  const addRSI = useCallback((config: Omit<RSIConfig, 'id'>) => {
+    RSIService.addConfig(config);
+    setShowRSIDialog(false);
   }, []);
 
   return (
@@ -130,6 +140,16 @@ const Header: React.FC<HeaderProps> = ({
           onClose={() => setShowMADialog(false)}
           theme={config.theme}
           isMobile={false} // You might want to make this dynamic based on screen size
+        />
+      )}
+
+      {/* ADDED: RSI Configuration Dialog */}
+      {showRSIDialog && (
+        <RSIConfigDialog
+          onSave={addRSI}
+          onClose={() => setShowRSIDialog(false)}
+          theme={config.theme}
+          isMobile={false}
         />
       )}
 
