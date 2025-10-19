@@ -53,8 +53,8 @@ const RSIControls: React.FC<RSIControlsProps> = ({
     <>
       <div style={{
         position: 'absolute',
-        bottom: '25px', // Position above time scale
-        left: '10px',
+        bottom: '35px', // Position above time scale
+        left: '45px',
         zIndex: 20,
         display: 'flex',
         flexDirection: 'column',
@@ -104,7 +104,6 @@ const RSIItem: React.FC<{
       background: theme === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(42, 46, 57, 0.9)',
       marginBottom: '2px',
       color: theme === 'light' ? '#2a2e39' : '#e0e0e0',
-      border: `1px solid ${theme === 'light' ? '#dee2e6' : '#40444f'}`,
       fontSize: '11px',
     }}>
       <div style={{ 
