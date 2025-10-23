@@ -34,16 +34,7 @@ export class RSIService {
       if (stored) {
         this.configs = JSON.parse(stored);
       } else {
-        // Default RSI configuration
-        this.configs = [{
-          id: 'rsi-default',
-          period: 14,
-          visible: true,
-          color: '#7E57C2',
-          lineWidth: 2,
-          overbought: 70,
-          oversold: 30
-        }];
+        this.configs = [];
         this.saveConfigs();
       }
     } catch (error) {
