@@ -168,6 +168,7 @@ const Chart: React.FC<ChartProps> = ({
                 rsiChartContainer = document.createElement('div');
                 rsiChartContainer.style.width = '100%';
                 rsiChartContainer.style.position = 'relative';
+                rsiChartContainer.style.borderTop = '1px solid #E5E7EB';
                 const rsiChartHeight = Math.floor(containerHeight * 0.3);
                 rsiChartContainer.style.height = `${rsiChartHeight}px`;
                 
