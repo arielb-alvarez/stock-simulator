@@ -47,17 +47,17 @@ const Header: React.FC<HeaderProps> = ({
   const handleIndicatorSelect = (indicator: string) => {
     if (indicator === 'Moving Average') {
       setShowMADialog(true);
+    } else if (indicator === 'RSI') {
+      setShowRSIDialog(true);
     }
     setShowIndicators(false);
   };
 
-  // Add new moving average globally
   const addMovingAverage = useCallback((config: MovingAverageConfig) => {
       MovingAverageService.addConfig({ ...config, visible: true });
       setShowMADialog(false);
   }, []);
 
-  // ADDED: Add new RSI globally
   const addRSI = useCallback((config: Omit<RSIConfig, 'id'>) => {
     RSIService.addConfig(config);
     setShowRSIDialog(false);
@@ -93,7 +93,7 @@ const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* Indicators Dropdown Button */}
+          {/* Indicators Dropdown */}
           <div className="indicators-dropdown">
             <button 
               className={`indicators-btn ${config.theme}`}
@@ -139,11 +139,11 @@ const Header: React.FC<HeaderProps> = ({
           onSave={addMovingAverage}
           onClose={() => setShowMADialog(false)}
           theme={config.theme}
-          isMobile={false} // You might want to make this dynamic based on screen size
+          isMobile={false}
         />
       )}
 
-      {/* ADDED: RSI Configuration Dialog */}
+      {/* RSI Configuration Dialog */}
       {showRSIDialog && (
         <RSIConfigDialog
           onSave={addRSI}

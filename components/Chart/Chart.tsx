@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { 
   createChart, 
   IChartApi, 
@@ -56,6 +56,11 @@ const Chart: React.FC<ChartProps> = ({
     const [rsiConfigs, setRSIConfigs] = useState<RSIConfig[]>(
         RSIService.getConfigs()
     );
+
+    // Check if we have any visible RSI configurations
+    const hasVisibleRSI = useMemo(() => {
+        return rsiConfigs.some(config => config.visible);
+    }, [rsiConfigs]);
 
     // Initialize currentDataRef when data prop changes
     useEffect(() => {
@@ -123,7 +128,7 @@ const Chart: React.FC<ChartProps> = ({
 
         let resizeObserver: ResizeObserver;
         let mainChart: IChartApi;
-        let rsiChart: IChartApi;
+        let rsiChart: IChartApi | null = null;
 
         const initializeCharts = () => {
             // Clear existing content
@@ -131,39 +136,95 @@ const Chart: React.FC<ChartProps> = ({
                 chartContainerRef.current.innerHTML = '';
             }
 
+            // Get container dimensions first
+            const containerWidth = chartContainerRef?.current?.clientWidth || 800;
+            const containerHeight = chartContainerRef?.current?.clientHeight || 600;
+
             // Create main chart container
             const mainChartContainer = document.createElement('div');
             mainChartContainer.style.width = '100%';
-            mainChartContainer.style.height = '70%';
-
-            // Create RSI chart container
-            const rsiChartContainer = document.createElement('div');
-            rsiChartContainer.style.width = '100%';
-            rsiChartContainer.style.height = '30%';
-
-            // Add containers to parent
-            if (chartContainerRef.current) {
-                chartContainerRef.current.appendChild(mainChartContainer);
-                chartContainerRef.current.appendChild(rsiChartContainer);
+            mainChartContainer.style.position = 'relative';
+            
+            // Set height based on whether RSI is visible
+            let mainChartHeight: number;
+            if (hasVisibleRSI) {
+                mainChartHeight = Math.floor(containerHeight * 0.7);
+                mainChartContainer.style.height = `${mainChartHeight}px`;
             } else {
-                return; // Exit if ref is null
+                mainChartHeight = containerHeight;
+                mainChartContainer.style.height = '100%';
             }
 
-            // Get container dimensions with null checks
-            const mainContainerWidth = mainChartContainer.clientWidth || 800;
-            const mainContainerHeight = mainChartContainer.clientHeight || 400;
-            const rsiContainerWidth = rsiChartContainer.clientWidth || 800;
-            const rsiContainerHeight = rsiChartContainer.clientHeight || 200;
+            // Add main container to parent
+            if (chartContainerRef.current) {
+                chartContainerRef.current.appendChild(mainChartContainer);
+            } else {
+                return;
+            }
 
-            // Create main chart
+            // Create RSI chart container only if needed
+            let rsiChartContainer: HTMLDivElement | null = null;
+            if (hasVisibleRSI) {
+                rsiChartContainer = document.createElement('div');
+                rsiChartContainer.style.width = '100%';
+                rsiChartContainer.style.position = 'relative';
+                const rsiChartHeight = Math.floor(containerHeight * 0.3);
+                rsiChartContainer.style.height = `${rsiChartHeight}px`;
+                
+                chartContainerRef.current.appendChild(rsiChartContainer);
+
+                // Create RSI chart with explicit dimensions
+                rsiChart = createChart(rsiChartContainer, {
+                    layout: {
+                        background: { topColor: 'solid', color: config.theme === 'dark' ? '#131722' : '#FFFFFF' },
+                        textColor: config.theme === 'dark' ? '#D9D9D9' : '#191919',
+                        fontSize: isMobile ? 10 : 12,
+                    },
+                    width: containerWidth,
+                    height: rsiChartHeight,
+                    timeScale: {
+                        timeVisible: true,
+                        secondsVisible: false,
+                        borderVisible: false,
+                    },
+                    rightPriceScale: {
+                        borderVisible: false,
+                        scaleMargins: {
+                            top: 0.1,
+                            bottom: 0.1,
+                        },
+                    },
+                    grid: {
+                        vertLines: { visible: false },
+                        horzLines: { visible: true, color: config.theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' },
+                    },
+                    crosshair: {
+                        mode: 1,
+                    },
+                    handleScroll: {
+                        mouseWheel: false,
+                        pressedMouseMove: false,
+                        horzTouchDrag: false,
+                        vertTouchDrag: false,
+                    },
+                    handleScale: {
+                        axisPressedMouseMove: false,
+                        mouseWheel: false,
+                        pinch: false,
+                    },
+                });
+                rsiChartRef.current = rsiChart;
+            }
+
+            // Create main chart with explicit dimensions
             mainChart = createChart(mainChartContainer, {
                 layout: {
                     background: { topColor: 'solid', color: config.theme === 'dark' ? '#131722' : '#FFFFFF' },
                     textColor: config.theme === 'dark' ? '#D9D9D9' : '#191919',
                     fontSize: isMobile ? 12 : 14,
                 },
-                width: mainContainerWidth,
-                height: mainContainerHeight,
+                width: containerWidth,
+                height: mainChartHeight,
                 timeScale: {
                     timeVisible: true,
                     secondsVisible: false,
@@ -218,62 +279,17 @@ const Chart: React.FC<ChartProps> = ({
                 priceScaleId: 'right',
             });
 
-            // Create RSI chart
-            rsiChart = createChart(rsiChartContainer, {
-                layout: {
-                    background: { topColor: 'solid', color: config.theme === 'dark' ? '#131722' : '#FFFFFF' },
-                    textColor: config.theme === 'dark' ? '#D9D9D9' : '#191919',
-                    fontSize: isMobile ? 10 : 12,
-                },
-                width: rsiContainerWidth,
-                height: rsiContainerHeight,
-                timeScale: {
-                    timeVisible: true,
-                    secondsVisible: false,
-                    borderVisible: false,
-                },
-                rightPriceScale: {
-                    borderVisible: false,
-                    scaleMargins: {
-                        top: 0.1,
-                        bottom: 0.1,
-                    },
-                },
-                grid: {
-                    vertLines: { visible: false },
-                    horzLines: { visible: true, color: config.theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' },
-                },
-                crosshair: {
-                    mode: 1,
-                },
-                handleScroll: {
-                    mouseWheel: false,
-                    pressedMouseMove: false,
-                    horzTouchDrag: false,
-                    vertTouchDrag: false,
-                },
-                handleScale: {
-                    axisPressedMouseMove: false,
-                    mouseWheel: false,
-                    pinch: false,
-                },
-            });
+            // Set references
+            chartRef.current = mainChart;
+            seriesRef.current = series;
+            setIsChartReady(true);
 
-            // Set references only if charts were created
-            if (mainChart && rsiChart) {
-                chartRef.current = mainChart;
-                seriesRef.current = series;
-                rsiChartRef.current = rsiChart;
-                setIsChartReady(true);
-            }
-
-            // Set up time scale synchronization after charts are ready
-            setTimeout(() => {
-                if (mainChart && rsiChart) {
+            // Set up time scale synchronization only if RSI chart exists
+            if (rsiChart) {
+                setTimeout(() => {
                     const mainTimeScale = mainChart.timeScale();
-                    const rsiTimeScale = rsiChart.timeScale();
+                    const rsiTimeScale = rsiChart!.timeScale();
 
-                    // Sync from main to RSI
                     mainTimeScale.subscribeVisibleTimeRangeChange((timeRange) => {
                         if (timeRange && rsiChartRef.current) {
                             try {
@@ -283,45 +299,48 @@ const Chart: React.FC<ChartProps> = ({
                             }
                         }
                     });
-
-                    // Sync from RSI to main (with protection)
-                    rsiTimeScale.subscribeVisibleTimeRangeChange((timeRange) => {
-                        if (timeRange && chartRef.current) {
-                            try {
-                                // Only sync if the main chart has data
-                                const mainRange = chartRef.current.timeScale().getVisibleRange();
-                                if (mainRange) {
-                                    chartRef.current.timeScale().setVisibleRange(timeRange);
-                                }
-                            } catch (error) {
-                                console.warn('Failed to sync time range from RSI chart:', error);
-                            }
-                        }
-                    });
-                }
-            }, 100);
-
-            setIsChartReady(true);
+                }, 100);
+            }
         };
 
         const updateDimensions = () => {
-            if (chartContainerRef.current && mainChart && rsiChart) {
+            if (chartContainerRef.current && mainChart) {
                 const width = chartContainerRef.current.clientWidth || 800;
                 const height = chartContainerRef.current.clientHeight || 600;
                 setChartDimensions({ width, height });
-                
-                const mainHeight = Math.floor(height * 0.7);
-                const rsiHeight = Math.floor(height * 0.3);
-                
-                mainChart.applyOptions({ 
-                    width, 
-                    height: mainHeight,
-                });
-                
-                rsiChart.applyOptions({ 
-                    width, 
-                    height: rsiHeight,
-                });
+
+                if (hasVisibleRSI) {
+                    const mainHeight = Math.floor(height * 0.7);
+                    const rsiHeight = Math.floor(height * 0.3);
+                    
+                    // Update main chart
+                    mainChart.resize(width, mainHeight);
+                    
+                    // Update RSI chart if it exists
+                    if (rsiChart) {
+                        rsiChart.resize(width, rsiHeight);
+                    }
+                } else {
+                    // Main chart takes full height
+                    mainChart.resize(width, height);
+                    
+                    // Clean up RSI chart if it exists but shouldn't
+                    if (rsiChart) {
+                        rsiSeriesMapRef.current.forEach((series) => {
+                            rsiChart!.removeSeries(series);
+                        });
+                        rsiSeriesMapRef.current.clear();
+                        
+                        // Remove RSI chart container from DOM
+                        const rsiContainer = chartContainerRef.current?.querySelector('div:nth-child(2)');
+                        if (rsiContainer) {
+                            rsiContainer.remove();
+                        }
+                        
+                        rsiChart = null;
+                        rsiChartRef.current = undefined;
+                    }
+                }
                 
                 // Fit content only if we have data
                 if (currentDataRef.current.length > 0) {
@@ -333,7 +352,7 @@ const Chart: React.FC<ChartProps> = ({
         initializeCharts();
         updateDimensions();
 
-        // Set up resize observer with null check
+        // Set up resize observer
         if (chartContainerRef.current) {
             resizeObserver = new ResizeObserver(updateDimensions);
             resizeObserver.observe(chartContainerRef.current);
@@ -356,10 +375,10 @@ const Chart: React.FC<ChartProps> = ({
                 resizeObserver.disconnect();
             }
 
-            // Clean up charts only if they were created
+            // Clean up charts
             if (mainChart) {
                 movingAverageSeriesRef.current.forEach((series) => {
-                    mainChart!.removeSeries(series);
+                    mainChart.removeSeries(series);
                 });
                 mainChart.remove();
             }
@@ -375,7 +394,7 @@ const Chart: React.FC<ChartProps> = ({
             rsiSeriesMapRef.current.clear();
             setIsChartReady(false);
         };
-    }, [config.theme, isMobile]);
+    }, [config.theme, isMobile, hasVisibleRSI]);
 
     // Enhanced moving average calculation
     const calculateMovingAverages = useCallback((dataForCalculation: CandleStickData[]) => {
@@ -436,7 +455,9 @@ const Chart: React.FC<ChartProps> = ({
 
     // RSI calculation and rendering
     const calculateRSI = useCallback((dataForCalculation: CandleStickData[]) => {
-        if (!rsiChartRef.current || !dataForCalculation.length) return;
+        if (!rsiChartRef.current || !dataForCalculation.length || !hasVisibleRSI) {
+            return;
+        }
 
         const currentConfigs = RSIService.getConfigs();
         const currentRSIIds = new Set(currentConfigs.map(config => config.id));
@@ -536,7 +557,7 @@ const Chart: React.FC<ChartProps> = ({
 
         // Sync time scales after RSI data is loaded
         setTimeout(syncTimeScales, 50);
-    }, [syncTimeScales]);
+    }, [syncTimeScales, hasVisibleRSI]);
 
     // Handle real-time data updates
     useEffect(() => {
@@ -639,12 +660,18 @@ const Chart: React.FC<ChartProps> = ({
         }
     }, [movingAverageConfigs, isChartReady, calculateMovingAverages]);
 
-    // Update RSI when configs change
+    // Update RSI when configs change or visibility changes
     useEffect(() => {
-        if (isChartReady && currentDataRef.current.length > 0) {
+        if (isChartReady && currentDataRef.current.length > 0 && hasVisibleRSI) {
             calculateRSI(currentDataRef.current);
+        } else if (!hasVisibleRSI && rsiChartRef.current) {
+            // Clean up RSI chart and series if no visible RSI configurations
+            rsiSeriesMapRef.current.forEach((series) => {
+                rsiChartRef.current?.removeSeries(series);
+            });
+            rsiSeriesMapRef.current.clear();
         }
-    }, [rsiConfigs, isChartReady, calculateRSI]);
+    }, [rsiConfigs, isChartReady, calculateRSI, hasVisibleRSI]);
 
     // Handle moving average configuration changes
     const handleMovingAveragesUpdate = useCallback((newConfigs: MovingAverageConfig[]) => {
@@ -705,7 +732,9 @@ const Chart: React.FC<ChartProps> = ({
                     width: '100%', 
                     height: '100%', 
                     position: 'relative',
-                    minHeight: '400px'
+                    minHeight: '400px',
+                    display: 'flex',
+                    flexDirection: 'column'
                 }} 
             />
             
@@ -720,15 +749,18 @@ const Chart: React.FC<ChartProps> = ({
                 isMobile={isMobile}
             />
             
-            <RSIControls
-                configs={rsiConfigs}
-                onConfigsUpdate={() => {}}
-                onToggleVisibility={toggleRSIVisibility}
-                onUpdateRSI={handleRSIUpdate}
-                onRemoveRSI={removeRSI}
-                theme={config.theme}
-                isMobile={isMobile}
-            />
+            {/* Only show RSI controls if there are RSI configurations */}
+            {rsiConfigs.length > 0 && (
+                <RSIControls
+                    configs={rsiConfigs}
+                    onConfigsUpdate={() => {}}
+                    onToggleVisibility={toggleRSIVisibility}
+                    onUpdateRSI={handleRSIUpdate}
+                    onRemoveRSI={removeRSI}
+                    theme={config.theme}
+                    isMobile={isMobile}
+                />
+            )}
             
             {isChartReady && chartRef.current && seriesRef.current && (
                 <DrawingLayer
